@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>JUNU   Music Player</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      font-family: Arial, sans-serif;
+      color: white;
+    }
+
+    #background {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: -1;
+      object-fit: cover;
+      transition: opacity 0.5s ease; /* 添加过渡效果 */
+    }
+
+    #controls {
+      position: fixed;
+      bottom: 10px;
+      right: 10px;
+      display: flex;
+      align-items: center;
+    }
+
+    #songTitle {
+      position: fixed;
+      bottom: -30px;
+      left: 20px;
+      font-size: 64px;
+      font-weight: bold;
+    }
+
+    #center {
+      position: fixed;
+      top: 40%;
+      left: 10%;
+    }
+
+    #composer {
+      transform: translateY(-50%);
+      font-size: 200%;
+      font-weight: bold;
+    }
+
+    #visualizer {
+      height: 10%;
+      display: flex;
+      justify-content: space-around;
+    }
+
+    .visualizer-bar {
+      width: 2px;
+      height: 0;
+      background-color: white;
+    }
+  </style>
+</head>
+<body>
+
+  <img id="background" src="" alt="Background Image">
+
+  <div id="controls">
+    <img id="prevButton" src="/上一首.png" alt="Previous">
+    <img id="playPauseButton" src="/暂停.png" alt="Play/Pause">
+    <img id="nextButton" src="/下一首.png" alt="Next">
+  </div>
+
+  <h1 id="songTitle"></h1>
+
+  <div id="center">
+    <h2 id="composer"></h2>
+    <canvas id="visualizer"></canvas>
+  </div>
+  <div id="music_list">
+	  
+  </div>
+
+  <script>
+    const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    let currentSongIndex = 0;
+    let audio = new Audio();
+    let songList = [];
+
+    const prevButton = document.getElementById("prevButton");
+    const playPauseButton = document.getElementById("playPauseButton");
+    const nextButton = document.getElementById("nextButton");
+    const songTitle = document.getElementById("songTitle");
+    const composer = document.getElementById("composer");
+    const background = document.getElementById("background");
+    const visualizer = document.getElementById("visualizer");
+
+    // Fetch initial song list and play the first song
+    fetch("/list")
+      .then(response => response.json())
+      .then(data => {
+        songList = data;
+        setTimeout(() => {loadSong(songList[currentSongIndex].num)},1000);
+      })
+      .catch(error => console.error("Failed to fetch initial song list:", error));
+
+    function loadSong(songNum) {
+      fetch(`/name/${songNum}`)
+        .then(response => response.text())
+        .then(name => {
+          songTitle.textContent = name.substring(1, name.length - 1);
+        })
+        .catch(error => console.error("Failed to fetch song name:", error));
+
+      fetch(`/musician/${songNum}`)
+        .then(response => response.text())
+        .then(artist => {
+          composer.textContent = artist.substring(1, artist.length - 1);
+        })
+        .catch(error => console.error("Failed to fetch artist name:", error));
+
+      fetch(`/photo/${songNum}?${Math.random()}`)
+        .then(response => {
+          if (response.ok) {
+            return response.blob();
+          } else {
+            throw new Error("Failed to fetch photo");
+          }
+        })
+        .then(blob => {
+          const url = URL.createObjectURL(blob);
+          background.style.opacity = "0"; // 设置不透明度为0，开始渐变
+          setTimeout(() => {
+            background.src = url; // 更改图片源
+            background.style.opacity = "1"; // 设置不透明度为1，结束渐变
+          }, 500); // 等待0.5秒，与过渡效果时间一致
+        })
+        .catch(error => console.error("Failed to fetch photo:", error));
+
+      audio.src = `/music/${songNum}`;
+      playPauseButton.src = "/暂停.png";
+      audio.play();
+    }
+
+    function togglePlayPause() {
+      const gainNode = audioContext.createGain();
+      const currentVolume = audioContext.createGain();
+      currentVolume.gain.value = audio.volume;
+
+      if (audio.paused) {
+        audioContext.resume().then(() => {
+          audio.play();
+          playPauseButton.src = "/暂停.png";
+          fadeAudio(gainNode, currentVolume, 0, 1, 0.3);
+        });
+      } else {
+        fadeAudio(gainNode, currentVolume, 1, 0, 0.3, () => {
+          audio.pause();
+          playPauseButton.src = "/播放.png";
+          gainNode.disconnect();
+        });
+      }
+    }
+
+    function fadeAudio(gainNode, currentVolume, startVolume, endVolume, duration, callback) {
+      gainNode.gain.setValueAtTime(currentVolume.gain.value, audioContext.currentTime);
+      gainNode.gain.linearRampToValueAtTime(startVolume, audioContext.currentTime);
+      gainNode.gain.linearRampToValueAtTime(endVolume, audioContext.currentTime + duration);
+
+      gainNode.connect(audioContext.destination);
+      currentVolume.connect(gainNode);
+
+      if (callback) {
+        setTimeout(callback, duration * 1000);
+      }
+    }
+
+    function playNextSong() {
+      currentSongIndex = (currentSongIndex + 1) % songList.length;
+      loadSong(songList[currentSongIndex].num);
+    }
+
+    function playPrevSong() {
+      currentSongIndex = currentSongIndex - 1;
+      if (currentSongIndex < 0) currentSongIndex=songList.length-1;
+      loadSong(songList[currentSongIndex].num);
+    }
+
+    function updateVisualizer() {
+      const analyser = audioContext.createAnalyser();
+      const context = visualizer.getContext("2d");
+      const dataArray = new Uint8Array(analyser.frequencyBinCount);
+
+      const source = audioContext.createMediaElementSource(audio);
+      source.connect(analyser);
+      analyser.connect(audioContext.destination);
+
+      analyser.fftSize = 512;
+
+      function draw() {
+        const bodyWidth = window.innerWidth;
+        const visualizerWidth = bodyWidth * 0.8; // 设置 visualizer 宽度为 body 宽度的98%
+        visualizer.width = visualizerWidth;
+        analyser.getByteFrequencyData(dataArray);
+        context.clearRect(0, 0, visualizer.width, visualizer.height);
+
+        const barWidth = visualizerWidth / 150
+        console.log("barWidth:", barWidth);
+
+        for (let i = 0; i <= 150; i++) {
+          const barHeight = dataArray[i]*0.5;
+          context.fillStyle = "white";
+          context.fillRect(i * barWidth, 0/*visualizer.height - (barHeight + 3)*/, barWidth*0.9, barHeight+3);
+        }
+
+        requestAnimationFrame(draw);
+      }
+
+      draw();
+    }
+
+    playPauseButton.addEventListener("click", togglePlayPause);
+    nextButton.addEventListener("click", playNextSong);
+    prevButton.addEventListener("click", playPrevSong);
+    audio.addEventListener("ended", playNextSong);
+
+    audio.addEventListener("play", updateVisualizer);
+    audio.addEventListener("pause", () => cancelAnimationFrame(draw)); // Assuming you declared draw somewhere
+
+    let isCooldown = false;
+
+    document.addEventListener("keydown", function (event) {
+      switch (event.code) {
+        case "Space":
+          togglePlayPause();
+          break;
+        case "ArrowLeft":
+          if (isCooldown) { return;}
+          // 设置冷却状态，并在0.5秒后重置
+          isCooldown = true;
+          setTimeout(function () {
+            isCooldown = false;
+          }, 2000);
+          playPrevSong();
+          break;
+        case "ArrowRight":
+          if (isCooldown) { return;}
+          // 设置冷却状态，并在0.5秒后重置
+          isCooldown = true;
+          setTimeout(function () {
+            isCooldown = false;
+          }, 2000);
+          playNextSong();
+          break;
+        default:
+          break;
+      }
+    });
+
+  </script>
+
+</body>
+</html>
