@@ -1,0 +1,6 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<info>
+	<infoitem key="UD_LiveData_params" value="2" />
+	<infoitem key="UD_LiveData_param0" value="/music/1=F:%5Cmusic_lisenter%5Cmusic%5C1%5Cmusic.wav&amp;/list=%5B%7B%22name%22:%22%E7%A5%9E%E5%A5%87%E6%95%B0%E5%AD%97%E9%A9%AC%E6%88%8F%E5%9B%A2%22,%22num%22:%221%22%7D%7D%5D" />
+	<infoitem key="UD_LiveData_param1" value="/music/1=F:%5Cmusic_lisenter%5Cmusic%5C1%5Cmusic.wav" />
+</info>

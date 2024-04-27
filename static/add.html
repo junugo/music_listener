@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>上传歌曲</title>
+</head>
+<body>
+    <h1>上传新歌曲</h1>
+    <form action="/add_music" method="post" enctype="multipart/form-data">
+        <label for="music_file">音乐文件：</label>
+        <input type="file" name="music_file" accept=".mp3, .wav" required><br>
+
+        <label for="image_file">图像文件：</label>
+        <input type="file" name="image_file" accept=".jpg, .jpeg, .png" required><br>
+
+        <label for="song_name">歌曲名称：</label>
+        <input type="text" name="song_name" required><br>
+
+        <label for="composer">作曲家：</label>
+        <input type="text" name="composer" required><br>
+
+        <input type="submit" value="上传">
+    </form>
+</body>
+</html>
