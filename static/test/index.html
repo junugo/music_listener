@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Canvas Real-time Capture</title>
+    <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
+    <style>
+      #divA {
+        width: 300px;
+        height: 200px;
+        background-color: #f0f0f0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 24px;
+      }
+      video {
+        width: 300px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="divA">Element A</div>
+    <video id="videoB" autoplay muted controls></video>
+    <button id="buttonC">生成视频</button>
+
+    <script>
+      const divA = document.getElementById("divA");
+      const videoB = document.createElement('video');
+      var canvas = document.createElement("canvas");
+      var ctx = canvas.getContext("2d");
+      html2canvas(divA).then((canvasNow) => {
+        canvas.width = canvasNow.width;
+        canvas.height = canvasNow.height;
+      });
+      function drawCanvas() {
+        html2canvas(divA).then((canvasNow) => {
+          //document.body.appendChild(canvasNow);
+          var imageA = new Image();
+          imageA.src = canvasNow.toDataURL();
+          imageA.onload = function () {
+            ctx.drawImage(imageA, 0, 0);
+          };
+        });
+      }
+      document.getElementById("buttonC").addEventListener("click", function () {
+        videoB.srcObject = canvas.captureStream(60);
+        videoB.addEventListener("canplay", (event) => {
+            videoB.play();
+            videoB.requestPictureInPicture();
+        });
+        setInterval(drawCanvas, 1000 / 60);
+      });
+    </script>
+  </body>
+</html>

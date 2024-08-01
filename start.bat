@@ -1,2 +1,1 @@
-cd .\\venv\\Scripts
-uvicorn.exe server:app --reload
+"venv/Scripts/python.exe" server.py

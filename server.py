@@ -1,14 +1,15 @@
-from fastapi import FastAPI, HTTPException, File, UploadFile, Form
-from fastapi.responses import FileResponse, HTMLResponse
-from fastapi.staticfiles import StaticFiles
-from typing import List
 import os
 from typing import List, Dict
+
+import uvicorn
 from PIL import Image
+from fastapi import FastAPI, HTTPException, File, UploadFile, Form
+from fastapi.responses import FileResponse, HTMLResponse
 from pydub import AudioSegment
 from pydub.exceptions import CouldntDecodeError
 
 app = FastAPI()
+
 
 # 挂载静态文件目录（包含index.html、music和images文件夹）
 # app.mount("/", StaticFiles(directory="static", html=True), name="static")
@@ -29,23 +30,49 @@ def get_music_info(num):
         "composer": composer,
         "song_name": song_name,
         "music_file": music_folder + "/" + [file for file in os.listdir(music_folder) if
-                                           os.path.isfile(os.path.join(music_folder, file)) and any(
-                                               file.lower().endswith(ext) for ext in music_valid_extensions)and "music" in file][0],
+                                            os.path.isfile(os.path.join(music_folder, file)) and any(
+                                                file.lower().endswith(ext) for ext in
+                                                music_valid_extensions) and "music." in file][0],
         "image_file": music_folder + "/" + [file for file in os.listdir(music_folder) if
-                                           os.path.isfile(os.path.join(music_folder, file)) and any(
-                                               file.lower().endswith(ext) for ext in pic_valid_extensions)and "music" in file][0],
+                                            os.path.isfile(os.path.join(music_folder, file)) and any(
+                                                file.lower().endswith(ext) for ext in
+                                                pic_valid_extensions) and "music." in file][0],
     }
 
-
+time = 0
 @app.get("/", response_class=HTMLResponse)
 async def get_index():
+    global time
+    time += 1
+    print(f"访问次数：{time}")
     return FileResponse("static/index.html")
 
-@app.get("/up", response_class=HTMLResponse)
-async def get_index():
-    return FileResponse("static/add.html")
 
-@app.get("/list/", response_model=List[Dict[str, str]])
+@app.get("/file/{page_name}", response_class=HTMLResponse)
+async def find_page(page_name: str):
+    # 通过路径参数指定页面名称，读取对应的 HTML 文件内容并返回
+    if "." not in page_name:
+        page_name += ".html"
+    file_path = f"static/{page_name}"
+    if os.path.exists(file_path):
+        return FileResponse(file_path)
+    else:
+        # 如果文件不存在，跳转至欢迎页面
+        return HTTPException(status_code=404, detail="页面在哪里？")
+
+@app.get("/icon/{page_name}")
+async def find_page(page_name: str):
+    if "." not in page_name:
+        page_name += ".svg"
+    file_path = f"static/icon/{page_name}"
+    if os.path.exists(file_path):
+        return FileResponse(file_path, media_type="image/svg+xml")
+    else:
+        # 如果文件不存在，跳转至欢迎页面
+        return HTTPException(status_code=404, detail="页面在哪里？")
+
+
+@app.get("/list/", response_model=List[Dict[str, str]])#废弃 API
 async def get_song_list():
     song_list = [
         {"name": await get_song_name(folder), "num": folder}
@@ -90,6 +117,15 @@ async def get_photo(num: str):
     except HTTPException as e:
         raise e
 
+@app.get("/all_information_of_music")
+async def information():
+    song_list = [
+        {"num": folder, "name": await get_song_name(folder), "musician":await get_musician(folder)}
+        for folder in os.listdir("music")
+        if os.path.isdir(f"music/{folder}")
+    ]
+    song_list = sorted(song_list, key=lambda x: int(x['num']))
+    return song_list
 
 @app.post("/add_music")
 async def add_music(
@@ -106,17 +142,17 @@ async def add_music(
     os.makedirs(new_song_folder, exist_ok=True)
 
     # 保存音乐文件
-    yuan=new_song_folder+"/yuan_"+music_file.filename
+    yuan = new_song_folder + "/yuan_" + music_file.filename
     with open(yuan, "wb") as file:
         file.write(music_file.file.read())
-    music_path = f"{new_song_folder}/music.wav"
+    music_path = f"{new_song_folder}/music.mp3"
     try:
         # 尝试解码上传的音频文件
         audio_streams = AudioSegment.from_file(yuan)
         if not audio_streams:
             raise HTTPException(status_code=400, detail="音频文件不包含有效的音频流")
-        # 转换为wav格式
-        audio_streams.export(music_path, format="wav")
+        # 转换为mp3格式
+        audio_streams.export(music_path, format="mp3")
     except CouldntDecodeError:
         raise HTTPException(status_code=400, detail="无法解码音频文件")
 
@@ -136,13 +172,14 @@ async def add_music(
 
     return {"num": new_song_num}
 
+
 @app.put("/update_music/{num}")
 async def update_music_info(
-    num: str,
-    music_file: UploadFile = File(...),
-    image_file: UploadFile = File(...),
-    song_name: str = Form(...),
-    composer: str = Form(...),
+        num: str,
+        music_file: UploadFile = File(...),
+        image_file: UploadFile = File(...),
+        song_name: str = Form(...),
+        composer: str = Form(...),
 ):
     try:
         # 获取现有音乐信息
@@ -182,3 +219,8 @@ async def update_music_info(
 
     except HTTPException as e:
         raise e
+
+
+if __name__ == "__main__":
+    uvicorn.run(app="server:app", host="127.0.0.1", port=88, reload=True)
+    #uvicorn.run(app="server:app", host="192.168.31.104", port=88, reload=True)
