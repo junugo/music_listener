@@ -142,7 +142,7 @@ async def add_music(
     os.makedirs(new_song_folder, exist_ok=True)
 
     # 保存音乐文件
-    yuan = new_song_folder + "/yuan_" + music_file.filename
+    yuan = new_song_folder + "/original_" + music_file.filename
     with open(yuan, "wb") as file:
         file.write(music_file.file.read())
     music_path = f"{new_song_folder}/music.mp3"

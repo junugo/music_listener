@@ -29,7 +29,7 @@
       height: 100%;
       z-index: -1;
       object-fit: cover;
-      transition: 0.5s ease; /* 添加过渡效果 */
+      /*transition: 0.5s ease;*/ /* 添加过渡效果 */
     }
 
     #controls {
@@ -125,6 +125,7 @@
       bottom: 0;
       transition: 1s ease;
       text-shadow: black 2px 2px 5px;
+      background: rgba(0, 0, 0, 0.025);
     }
 
     #SidebarButton {
@@ -252,6 +253,14 @@
     #controls img {
       margin: 10px;
     }
+
+    #effects {
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: 0;
+      bottom: 0;
+  }
   </style>
   <style>
     .tooltip .tooltiptext {
@@ -280,7 +289,6 @@
       transition: 1s ease;
       opacity: 0;
     }
-
   </style>
   <body>
     <div id="all">
@@ -325,6 +333,7 @@
 
       <div id="music_area">
         <img id="background" src="" alt="Background Image">
+        <div id="effects"></div>
 
         <p class="normal" id="songTitle">songTitle</p>
 
@@ -376,6 +385,7 @@
       const SongList = document.getElementById("SongList");
       const Tip = document.getElementById("Tip");
       const PiP = document.getElementById("PiP");//画中画
+      const effects = document.getElementById("effects");
 
       // Fetch initial song list and play the first song
       /*
@@ -441,6 +451,7 @@
           })
           .then((blob) => {
             const url = URL.createObjectURL(blob);
+            background.style.transition = "0.5s ease";
             background.style.opacity = "0"; // 设置不透明度为0，开始渐变
             background.style.transform = "scale(1.5)";
             setTimeout(() => {
@@ -448,6 +459,9 @@
               background.style.opacity = "1"; // 设置不透明度为1，结束渐变
               background.style.transform = "scale(1)";
             }, 500); // 等待0.5秒，与过渡效果时间一致
+            setTimeout(() => {
+              background.style.transition = "0.5s";
+            }, 500);
           })
           .catch((error) => console.error("Failed to fetch photo:", error));
         audio.src = `/music/${songNum}`;
@@ -550,7 +564,11 @@
 
         analyser.fftSize = 512;
 
+        //var last_VH = 0
         function draw() {
+          var effect1=true;
+          var effect2=true;
+          
           var num = 250;
           const visualizerWidth = visualizer.offsetWidth;
           visualizer.width = visualizerWidth;
@@ -559,7 +577,36 @@
 
           const barWidth = visualizerWidth / num;
           const shadow = barWidth / 3;
-          console.log("barWidth:", barWidth, visualizer.width);
+          //console.log("barWidth:", barWidth, visualizer.width);
+
+          var now_VH=0
+          for (let i = 0; i <= num; i++) {
+            now_VH+=dataArray[i]
+          }
+          var VH=20000
+          if(now_VH>VH){
+            console.info("high",now_VH)
+            if(effect1){effects.style["box-shadow"] = `inset white 0px 0px 50px ${(now_VH-25000)*0.01}px`;}
+            if(effect2){background.style.transition = "0.01s";
+                        background.style.transform = `scale(${1+(now_VH-VH)/50000})`;}
+          }
+          else{
+            if(effect1){effects.style["box-shadow"] = `inset white 0px 0px 0px 0px`;}
+            if(effect2){background.style.transition = "0.5s";
+                        background.style.transform = `scale(1)`;}
+          }
+          /*
+          if(now_VH-last_VH>1000){
+            console.info("boom",now_VH-last_VH)
+            background.style.transition = "0.01s";
+            background.style.transform = `scale(${1+(now_VH-last_VH-1000)/10000})`;
+          }
+          else{
+            background.style.transition = "0.5s";
+            background.style.transform = `scale(1)`;
+          }
+          */
+          //last_VH=now_VH
 
           for (let i = 0; i <= num; i++) {
             const barHeight = dataArray[i] * 0.5;
