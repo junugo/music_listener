@@ -268,7 +268,9 @@
       font-size: 32px;
       position: absolute;
       display: flex;
-      left: 50%;
+      width: 100%;
+      justify-content: center;
+      text-align: center;
       top: 5%;
       transition: 0.5s ease;
       opacity: 0;
@@ -605,6 +607,10 @@
           visualizer.width = visualizerWidth;
           analyser.getByteFrequencyData(dataArray);
           context.clearRect(0, 0, visualizer.width, visualizer.height);
+
+          if (visualizerWidth / num < 4.5){
+            var num = Math.floor(visualizerWidth/4.5)
+          }
 
           const barWidth = visualizerWidth / num;
           const shadow = barWidth / 3;
