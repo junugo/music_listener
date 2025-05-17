@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
-  <title>JUNU   Music Player</title>
+  <!--<script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>-->
+  <title>JUNU Music Player</title>
   <style>
     @font-face {
       font-family: 'normal';
@@ -46,6 +46,7 @@
       left: 20px;
       font-size: 64px;
       font-weight: bold;
+      width: 60%;
     }
 
     #center {
@@ -235,6 +236,7 @@
     #SongList {
       height: 75%;
       width: 80%;
+      overflow: auto;
     }
 
     .MusicBox{
@@ -260,7 +262,17 @@
       right: 0;
       top: 0;
       bottom: 0;
-  }
+    }
+
+    #Volume{
+      font-size: 32px;
+      position: absolute;
+      display: flex;
+      left: 50%;
+      top: 5%;
+      transition: 0.5s ease;
+      opacity: 0;
+    }
   </style>
   <style>
     .tooltip .tooltiptext {
@@ -318,6 +330,9 @@
         <div 
           style="width: 90%;border-bottom: 2px solid #a7a7a7">
         </div>
+        <div 
+          style="height: 20px">
+        </div>
         <div id="SongList"></div>
         <div 
           style="height: 20px;width: 90%;border-bottom: 2px solid #a7a7a7">
@@ -331,24 +346,28 @@
         </div>
       </div>
 
-      <div id="music_area">
-        <img id="background" src="" alt="Background Image">
-        <div id="effects"></div>
+      <div id="area">
+        <div id="music_area">
+          <img id="background" src="" alt="Background Image">
+          <div id="effects"></div>
 
-        <p class="normal" id="songTitle">songTitle</p>
+          <p class="normal" id="Volume">100%</p>
 
-        <div id="center">
-          <div id="info">
-            <p class="normal" id="composer">composer</p>
-            <p class="normal" id="currentTime">00:00</p>
+          <p class="normal" id="songTitle">songTitle</p>
+
+          <div id="center">
+            <div id="info">
+              <p class="normal" id="composer">composer</p>
+              <p class="normal" id="currentTime">00:00</p>
+            </div>
+            <canvas id="visualizer"></canvas>
           </div>
-          <canvas id="visualizer"></canvas>
+          <div id="controls">
+            <img id="prevButton" src="/icon/skip-back.svg" alt="prev" />
+            <img id="playPauseButton" src="/icon/play.svg" alt="play" />
+            <img id="nextButton" src="/icon/skip-forward.svg" alt="next" />
+          </div>
         </div>
-      </div>
-      <div id="controls">
-        <img id="prevButton" src="/icon/skip-back.svg" alt="prev" />
-        <img id="playPauseButton" src="/icon/play.svg" alt="play" />
-        <img id="nextButton" src="/icon/skip-forward.svg" alt="next" />
       </div>
     </div>
 
@@ -359,7 +378,7 @@
       const audioContext = new (window.AudioContext ||
         window.webkitAudioContext)();
       let currentSongIndex = 0;
-      let audio = new Audio();
+      var audio = new Audio();
       let songList = [];
 
       const prevButton = document.getElementById("prevButton");
@@ -386,6 +405,13 @@
       const Tip = document.getElementById("Tip");
       const PiP = document.getElementById("PiP");//画中画
       const effects = document.getElementById("effects");
+      const MArea = document.getElementById("music_area");
+      const Area = document.getElementById("area");
+      const Volume = document.getElementById("Volume");
+
+      var PiPNow = false
+      let pipWindow
+      var VolumeTipTimeOut
 
       // Fetch initial song list and play the first song
       /*
@@ -569,7 +595,12 @@
           var effect1=true;
           var effect2=true;
           
-          var num = 250;
+          if (PiPNow){
+            var num = 125;
+          }
+          else{
+            var num = 250;
+          }
           const visualizerWidth = visualizer.offsetWidth;
           visualizer.width = visualizerWidth;
           analyser.getByteFrequencyData(dataArray);
@@ -609,7 +640,13 @@
           //last_VH=now_VH
 
           for (let i = 0; i <= num; i++) {
-            const barHeight = dataArray[i] * 0.5;
+            if (PiPNow){
+              var h = dataArray[i] * 0.2;
+            }
+            else{
+              var h = dataArray[i] * 0.5;
+            }
+            const barHeight = h
             context.fillStyle = "black";
             context.fillRect(
               i * barWidth,
@@ -654,7 +691,9 @@
         } else {
           BarOpened = true;
           menu.style.transform = "translateX(0px)";
-          music_area.style.left = MenuWidth;
+          if (!PiPNow){
+            music_area.style.left = MenuWidth;
+          }
           SidebarButton.style["background-color"] = "rgba(160, 160, 160, 0.5)";
           Tip.style.opacity = "1";
         }
@@ -689,6 +728,12 @@
       audio.addEventListener("volumechange", function () {
         var percentage = audio.volume * 100;
         Vprogress.style.width = percentage + "%";
+        Volume.innerText = Math.round(percentage) + "%";
+        Volume.style.opacity = "1";
+        clearTimeout(VolumeTipTimeOut);
+        VolumeTipTimeOut = setTimeout(() => {
+          Volume.style.opacity = "0";
+        },1000)
       });
 
       // 拖动音量条
@@ -803,8 +848,7 @@
             break;
         }
       });
-    </script>
-    <script>
+      /*
       const divA = document.getElementById("music_area");
       const videoB = document.createElement('video');
       var fps = 3
@@ -827,6 +871,7 @@
         });
       }
       function OpenPiP(){
+        
         if (PiPNow == false) {
           PiPNow = true
           videoB.srcObject = canvas.captureStream(fps);
@@ -843,6 +888,128 @@
           document.exitPictureInPicture();
           console.log('Video left Picture-in-Picture mode.');
           clearInterval(ID);
+        }
+      }
+      已废弃
+      */
+
+      var Style="\
+        #songTitle{\
+          bottom: -30px;\
+          left: 10px;\
+          font-size: 32px;\
+        }\
+        #composer{\
+          font-size: 20px;\
+        }\
+        #currentTime{\
+          font-size: 20px;\
+        }\
+        #controls {\
+          bottom: 0px;\
+        }\
+        #controls img {\
+          width: 32px;\
+        }\
+      "
+
+      async function OpenPiP(){
+        if (PiPNow == false) {
+          console.log("PiP start");
+          PiPNow = true
+          if (document.pictureInPictureElement) {
+            await document.exitPictureInPicture();
+          } else {
+            pipWindow = await documentPictureInPicture.requestWindow({
+              width: 320,
+              height: 180,
+              //disallowReturnToOpener: true,
+            });
+            // 其中 width 和 height 是可选参数，用于指定画中画窗口的大小
+            pipWindow.addEventListener("pagehide", (event) => {
+              PiPNow = false
+              Area.append(event.target.getElementById("music_area"));
+              if (BarOpened) {
+                music_area.style.left = MenuWidth;
+              } else {
+                music_area.style.left = "0";
+              }
+            });
+
+            // Copy all style sheets.
+            [...document.styleSheets].forEach((styleSheet) => {
+                const cssRules = [...styleSheet.cssRules].map((rule) => rule.cssText).join('');
+                const style = document.createElement('style');
+
+                style.textContent = cssRules;
+                pipWindow.document.head.appendChild(style);
+            });
+            const StyleElement = document.createElement('style')
+            StyleElement.textContent = Style;
+            pipWindow.document.head.appendChild(StyleElement);
+            music_area.style.left = "0";
+
+            pipWindow.document.body.append(MArea);
+            pipWindow.document.addEventListener("keydown", function (event) {
+              console.log("pip",event.code);
+              switch (event.code) {
+                case "KeyM":
+                  OpenSidebar();
+                  window.focus();
+                  break;
+                case "KeyE":
+                  OpenSidebar();
+                  window.focus();
+                  break;
+                case "Space":
+                  togglePlayPause();
+                  break;
+                case "ArrowLeft":
+                  if (isCoolDown) {
+                    return;
+                  }
+                  // 设置冷却状态，并在0.5秒后重置
+                  isCoolDown = true;
+                  setTimeout(function () {
+                    isCoolDown = false;
+                  }, CoolDownTime);
+                  playPrevSong();
+                  break;
+                case "ArrowRight":
+                  if (isCoolDown) {
+                    return;
+                  }
+                  // 设置冷却状态，并在0.5秒后重置
+                  isCoolDown = true;
+                  setTimeout(function () {
+                    isCoolDown = false;
+                  }, CoolDownTime);
+                  playNextSong();
+                  break;
+                case "ArrowUp":
+                  var newVolume = audio.volume + 0.1;
+                  if (newVolume > 1) newVolume = 1;
+                  audio.volume = newVolume;
+                  break;
+                case "ArrowDown":
+                  var newVolume = audio.volume - 0.1;
+                  if (newVolume < 0) newVolume = 0;
+                  audio.volume = newVolume;
+                  break;
+                case "KeyP":
+                  OpenPiP();
+                  break;
+                default:
+                  break;
+              }
+            });
+          }
+          
+        }
+        else{
+          pipWindow.close();
+          console.log('Video left Picture-in-Picture mode.');
+          window.focus();
         }
       }
       document.getElementById("PiP").addEventListener("click", function () {
