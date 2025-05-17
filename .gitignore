@@ -4,6 +4,9 @@
 /music/
 /frp
 /something
+/static/useless/
+/static/test/
+__pycache__/
 .idea/
 ffmpeg.exe
 ffplay.exe
