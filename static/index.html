@@ -275,6 +275,19 @@
       transition: 0.5s ease;
       opacity: 0;
     }
+
+    #tip{
+      color: black;
+      font-size: 30px;
+      position: fixed;
+      right: 20px;
+      text-align: right;
+      text-shadow: #999999 5px 5px 5px;
+    }
+
+    .pointer{
+      cursor: pointer;
+    }
   </style>
   <style>
     .tooltip .tooltiptext {
@@ -325,9 +338,9 @@
           style="height: 20px;width: 90%;border-bottom: 2px solid #a7a7a7">
         </div>
         <div id="Tool">
-          <a href="/file/add" target="_blank"><img id="upload-cloud" src="/icon/upload-cloud.svg" alt="upload-cloud" /></a>
-          <img id="PiP" src="/icon/monitor.svg" alt="monitor" />
-          <img id="playMode" src="/icon/arrow-right.svg" alt="PlayMode" />
+          <a class="pointer" href="/file/add" target="_blank" title="Upload Music"><img id="upload-cloud" src="/icon/upload-cloud.svg" alt="upload-cloud" /></a>
+          <img id="PiP" class="pointer" src="/icon/monitor.svg" alt="monitor" title="PiP"/>
+          <img id="playMode" class="pointer" src="/icon/arrow-right.svg" alt="PlayMode" title="PlayMode"/>
         </div>
         <div 
           style="width: 90%;border-bottom: 2px solid #a7a7a7">
@@ -340,11 +353,11 @@
           style="height: 20px;width: 90%;border-bottom: 2px solid #a7a7a7">
         </div>
         <div id="VolumeControl">
-          <img id="volume-x" src="/icon/volume-x.svg" alt="volume-x" />
+          <img id="volume-x" class="pointer" src="/icon/volume-x.svg" alt="volume-x" />
           <div class="progressBar" id="VprogressBar">
             <div class="progress" id="Vprogress"></div>
           </div>
-          <img id="volume-2" src="/icon/volume-2.svg" alt="volume-2" />
+          <img id="volume-2" class="pointer" src="/icon/volume-2.svg" alt="volume-2" />
         </div>
       </div>
 
@@ -365,9 +378,9 @@
             <canvas id="visualizer"></canvas>
           </div>
           <div id="controls">
-            <img id="prevButton" src="/icon/skip-back.svg" alt="prev" />
-            <img id="playPauseButton" src="/icon/play.svg" alt="play" />
-            <img id="nextButton" src="/icon/skip-forward.svg" alt="next" />
+            <img id="prevButton" class="pointer" src="/icon/skip-back.svg" alt="prev" />
+            <img id="playPauseButton" class="pointer" src="/icon/play.svg" alt="play" />
+            <img id="nextButton" class="pointer" src="/icon/skip-forward.svg" alt="next" />
           </div>
         </div>
       </div>
@@ -736,6 +749,9 @@
         Vprogress.style.width = percentage + "%";
         Volume.innerText = Math.round(percentage) + "%";
         Volume.style.opacity = "1";
+        
+        setCookie()
+
         clearTimeout(VolumeTipTimeOut);
         VolumeTipTimeOut = setTimeout(() => {
           Volume.style.opacity = "0";
@@ -760,6 +776,33 @@
       function VonMouseUp() {
         document.removeEventListener("mousemove", VonMouseMove);
         document.removeEventListener("mouseup", VonMouseUp);
+      }
+
+      // 获取Cookie值
+      function getCookie() {
+        console.log(document.cookie)
+          let cookieArray = document.cookie.split('; ');
+          let cookiePair;
+          for (let i = 0; i < cookieArray.length; i++) {
+              cookiePair = cookieArray[i].split('=');
+              if (cookiePair[0] === "Volume") {
+                  audio.volume = decodeURIComponent(cookiePair[1]);
+                  return ;
+              }
+          }
+          audio.volume=1
+      }
+
+      getCookie()
+
+      // 设置Cookie值
+      function setCookie() {
+          // 更新Cookie
+          let expires = "";
+          let date = new Date();
+          date.setTime(date.getTime() + (2592000000));//一个月
+          expires = "; expires=" + date.toUTCString();
+          document.cookie = "Volume" + "=" + "0." + encodeURIComponent(Math.round(audio.volume * 100)) + expires + "; path=/";
       }
 
       SidebarButton.addEventListener("click", OpenSidebar);
@@ -854,6 +897,21 @@
             break;
         }
       });
+      document.addEventListener('wheel', function(event) {
+        // 获取滚动量
+        let deltaY = event.deltaY; // 垂直滚动量
+
+        // 判断滚动方向
+        if (deltaY > 0) {
+          var newVolume = audio.volume - 0.01;
+          if (newVolume < 0) newVolume = 0;
+          audio.volume = newVolume;
+        } else if (deltaY < 0) {
+          var newVolume = audio.volume + 0.01;
+          if (newVolume > 1) newVolume = 1;
+          audio.volume = newVolume;
+        }
+      });
       /*
       const divA = document.getElementById("music_area");
       const videoB = document.createElement('video');
@@ -927,14 +985,15 @@
             await document.exitPictureInPicture();
           } else {
             pipWindow = await documentPictureInPicture.requestWindow({
-              width: 320,
-              height: 180,
+              width: 480,
+              height: 240,
               //disallowReturnToOpener: true,
               preferInitialWindowPlacement: true,
             });
             // 其中 width 和 height 是可选参数，用于指定画中画窗口的大小
             pipWindow.addEventListener("pagehide", (event) => {
               PiPNow = false
+              Area.innerHTML='';
               Area.append(event.target.getElementById("music_area"));
               if (BarOpened) {
                 music_area.style.left = MenuWidth;
@@ -957,6 +1016,7 @@
             music_area.style.left = "0";
 
             pipWindow.document.body.append(MArea);
+            Area.innerHTML='<p id="tip" class="normal">Picture-in-Picture (PiP) playback</p>';
             pipWindow.document.addEventListener("keydown", function (event) {
               console.log("pip",event.code);
               switch (event.code) {
@@ -1008,6 +1068,22 @@
                   break;
                 default:
                   break;
+              }
+              
+            });
+            pipWindow.document.addEventListener('wheel', function(event) {
+              // 获取滚动量
+              let deltaY = event.deltaY; // 垂直滚动量
+
+              // 判断滚动方向
+              if (deltaY > 0) {
+                var newVolume = audio.volume - 0.01;
+                if (newVolume < 0) newVolume = 0;
+                audio.volume = newVolume;
+              } else if (deltaY < 0) {
+                var newVolume = audio.volume + 0.01;
+                if (newVolume > 1) newVolume = 1;
+                audio.volume = newVolume;
               }
             });
           }
