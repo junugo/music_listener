@@ -427,6 +427,8 @@
       var PiPNow = false
       let pipWindow
       var VolumeTipTimeOut
+      
+      let isMouseOver = false;
 
       // Fetch initial song list and play the first song
       /*
@@ -441,6 +443,7 @@
         );
       已废弃
       */
+      /*
       fetch("/all_information_of_music")
         .then((response) => response.json())
         .then((data) => {
@@ -460,6 +463,32 @@
         .catch((error) =>
           console.error("Failed to fetch initial song list:", error)
         );
+      已废弃
+      */
+      
+      function loadAlbum(albumNum) {
+        fetch(`/album/${albumNum}`)
+          .then((response) => response.json())
+          .then((data) => {
+            songList = data;
+            loadSong(songList[currentSongIndex].num);
+            SongList.innerHTML=""
+            for (let i = 0; i < songList.length; i++) {
+              Item=document.createElement("div")
+              Item.classList=["MusicBox"]
+              Item.innerHTML = `<div class="MusicItem scroll-wrap"><div class="normal scroll-item ">${songList[i].name} - ${songList[i].musician}</div></div>`;//JS 报错的小曲 - JUNU
+              Item.addEventListener("click", function () {
+                currentSongIndex = i
+                loadSong(songList[currentSongIndex].num);
+              });
+              SongList.appendChild(Item);
+            }
+          })
+          .catch((error) =>
+            console.error("Failed to fetch initial song list:", error)
+          );
+      }
+      loadAlbum("all");
 
       function loadSong(songNum) {
         fetch(`/name/${songNum}`)
@@ -897,19 +926,32 @@
             break;
         }
       });
-      document.addEventListener('wheel', function(event) {
-        // 获取滚动量
-        let deltaY = event.deltaY; // 垂直滚动量
 
-        // 判断滚动方向
-        if (deltaY > 0) {
-          var newVolume = audio.volume - 0.01;
-          if (newVolume < 0) newVolume = 0;
-          audio.volume = newVolume;
-        } else if (deltaY < 0) {
-          var newVolume = audio.volume + 0.01;
-          if (newVolume > 1) newVolume = 1;
-          audio.volume = newVolume;
+      music_area.addEventListener("mouseenter", function() {
+        isMouseOver = true;
+        console.log("鼠标进入元素");
+      });
+
+      music_area.addEventListener("mouseleave", function() {
+        isMouseOver = false;
+        console.log("鼠标离开元素");
+      });
+
+      document.addEventListener('wheel', function(event) {
+        if (isMouseOver) {
+          // 获取滚动量
+          let deltaY = event.deltaY; // 垂直滚动量
+
+          // 判断滚动方向
+          if (deltaY > 0) {
+            var newVolume = audio.volume - 0.01;
+            if (newVolume < 0) newVolume = 0;
+            audio.volume = newVolume;
+          } else if (deltaY < 0) {
+            var newVolume = audio.volume + 0.01;
+            if (newVolume > 1) newVolume = 1;
+            audio.volume = newVolume;
+          }
         }
       });
       /*
@@ -975,12 +1017,16 @@
         #controls img {\
           width: 32px;\
         }\
+        #center {\
+          top: 35%;\
+        }\
       "
 
       async function OpenPiP(){
         if (PiPNow == false) {
           console.log("PiP start");
           PiPNow = true
+          isMouseOver = false; // 假定鼠标离开小窗，避免音量意外调整
           if (document.pictureInPictureElement) {
             await document.exitPictureInPicture();
           } else {
