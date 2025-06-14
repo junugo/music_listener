@@ -195,11 +195,11 @@ async def add_music(
     yuan = new_song_folder + "/original_" + music_file.filename
     with open(yuan, "wb") as file:
         file.write(music_file.file.read())
-    music_path = f"{new_song_folder}/music.mp3"
+    original_music_path = f"{new_song_folder}/music.mp3"
     try:
         # 调用 ffmpeg 尝试解码并转换上传的音频文件
         # 构建 ffmpeg 命令
-        cmd = ["ffmpeg", "-i", yuan, "-vn", "-ar", "44100", "-ac", "2", "-b:a", "192k", music_path]
+        cmd = ["ffmpeg", "-i", yuan, "-vn", "-ar", "44100", "-ac", "2", "-b:a", "192k", original_music_path]
         # 执行命令
         subprocess.run(cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     except subprocess.CalledProcessError as e:

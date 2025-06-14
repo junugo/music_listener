@@ -282,7 +282,7 @@
       position: fixed;
       right: 20px;
       text-align: right;
-      text-shadow: #999999 5px 5px 5px;
+      /*text-shadow: #999999 5px 5px 5px;*/
     }
 
     .pointer{
@@ -633,11 +633,14 @@
         analyser.connect(audioContext.destination);
 
         analyser.fftSize = 512;
+        
+        var effect1=true;
+        var effect2=true;
+
+        var all = 360
 
         //var last_VH = 0
         function draw() {
-          var effect1=true;
-          var effect2=true;
           
           if (PiPNow){
             var num = 125;
@@ -659,11 +662,13 @@
           //console.log("barWidth:", barWidth, visualizer.width);
 
           var now_VH=0
-          for (let i = 0; i <= num; i++) {
-            now_VH+=dataArray[i]
+          var max_VH=0
+          for (let i = 0; i <= all; i++) {
+            now_VH += dataArray[i]
+            max_VH = Math.max(max_VH,dataArray[i])
           }
           var VH=20000
-          if(now_VH>VH){
+          if(now_VH>VH && !PiPNow){
             console.info("high",now_VH)
             if(effect1){effects.style["box-shadow"] = `inset white 0px 0px 50px ${(now_VH-25000)*0.01}px`;}
             if(effect2){background.style.transition = "0.01s";
@@ -929,12 +934,12 @@
 
       music_area.addEventListener("mouseenter", function() {
         isMouseOver = true;
-        console.log("鼠标进入元素");
+        //console.log("鼠标进入元素");
       });
 
       music_area.addEventListener("mouseleave", function() {
         isMouseOver = false;
-        console.log("鼠标离开元素");
+        //console.log("鼠标离开元素");
       });
 
       document.addEventListener('wheel', function(event) {
@@ -1039,6 +1044,7 @@
             // 其中 width 和 height 是可选参数，用于指定画中画窗口的大小
             pipWindow.addEventListener("pagehide", (event) => {
               PiPNow = false
+              document.body.style.background = "";
               Area.innerHTML='';
               Area.append(event.target.getElementById("music_area"));
               if (BarOpened) {
@@ -1060,6 +1066,8 @@
             StyleElement.textContent = Style;
             pipWindow.document.head.appendChild(StyleElement);
             music_area.style.left = "0";
+
+            document.body.style.background = "#999999";
 
             pipWindow.document.body.append(MArea);
             Area.innerHTML='<p id="tip" class="normal">Picture-in-Picture (PiP) playback</p>';
