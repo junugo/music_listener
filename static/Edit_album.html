@@ -1,0 +1,833 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>专辑编辑</title>
+    <style>
+      @font-face {
+        font-family: "normal";
+        src: url("/file/正酷超级黑.ttf");
+        font-weight: normal;
+        font-style: normal;
+      }
+
+      body {
+        margin: 0;
+        padding: 0;
+        font-family: Arial, sans-serif;
+        color: white;
+        background-color: #1a1a1a;
+      }
+
+      .container {
+        display: flex;
+        height: 100vh;
+      }
+
+      .sidebar {
+        width: 250px;
+        background-color: #2a2a2a;
+        padding: 20px;
+        overflow-y: auto;
+      }
+
+      .main-content {
+        flex: 1;
+        padding: 20px;
+        overflow-y: auto;
+      }
+
+      h1,
+      h2,
+      h3 {
+        font-family: "normal", Arial, sans-serif;
+        margin-top: 0;
+      }
+
+      .album-list {
+        list-style: none;
+        padding: 0;
+      }
+
+      .album-item {
+        padding: 10px;
+        margin-bottom: 10px;
+        background-color: #3a3a3a;
+        border-radius: 5px;
+        cursor: pointer;
+        transition: background-color 0.3s;
+      }
+
+      .album-item:hover {
+        background-color: #4a4a4a;
+      }
+
+      .album-item.active {
+        background-color: #5a5a5a;
+        border-left: 4px solid #ffffff;
+      }
+
+      .album-details {
+        background-color: #2a2a2a;
+        padding: 20px;
+        border-radius: 10px;
+        margin-bottom: 20px;
+        position: relative;
+      }
+
+      .album-name-input {
+        width: 100%;
+        padding: 10px;
+        font-size: 18px;
+        background-color: #3a3a3a;
+        color: white;
+        border: none;
+        border-radius: 5px;
+        margin-bottom: 10px;
+        font-family: "normal", Arial, sans-serif;
+      }
+
+      .song-list {
+        list-style: none;
+        padding: 0;
+      }
+
+      .song-item {
+        padding: 10px;
+        margin-bottom: 5px;
+        background-color: #3a3a3a;
+        border-radius: 5px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+
+      .song-item.dragging {
+        opacity: 0.5;
+      }
+
+      .song-handle {
+        cursor: move;
+        margin-right: 10px;
+      }
+
+      .remove-song {
+        background-color: #ff4d4d;
+        border: none;
+        color: white;
+        padding: 5px 10px;
+        border-radius: 3px;
+        cursor: pointer;
+      }
+
+      .available-songs {
+        background-color: #2a2a2a;
+        padding: 20px;
+        border-radius: 10px;
+      }
+
+      .add-song {
+        background-color: #4caf50;
+        border: none;
+        color: white;
+        padding: 5px 10px;
+        border-radius: 3px;
+        cursor: pointer;
+      }
+
+      .button-group {
+        margin-top: 20px;
+        display: flex;
+        gap: 10px;
+      }
+
+      .action-button {
+        padding: 10px 20px;
+        background-color: #5a5a5a;
+        color: white;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        font-size: 16px;
+        transition: background-color 0.3s;
+      }
+
+      .action-button:hover {
+        background-color: #7a7a7a;
+      }
+
+      .action-button.primary {
+        background-color: #008cba;
+      }
+
+      .action-button.primary:hover {
+        background-color: #006b8f;
+      }
+
+      .action-button.danger {
+        background-color: #f44336;
+      }
+
+      .action-button.danger:hover {
+        background-color: #d32f2f;
+      }
+
+      .search-box {
+        width: 100%;
+        padding: 10px;
+        font-size: 16px;
+        background-color: #3a3a3a;
+        color: white;
+        border: none;
+        border-radius: 5px;
+        margin-bottom: 15px;
+      }
+
+      /* 自动保存动画样式 */
+      .save-indicator {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        padding: 12px 24px;
+        border-radius: 25px;
+        font-size: 14px;
+        font-weight: bold;
+        z-index: 1000;
+        opacity: 0;
+        transform: translateY(-20px);
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+      }
+
+      .save-indicator.show {
+        opacity: 1;
+        transform: translateY(0);
+      }
+
+      .save-indicator.success {
+        background-color: #4caf50;
+        color: white;
+      }
+
+      .save-indicator.error {
+        background-color: #f44336;
+        color: white;
+      }
+
+      .save-indicator.saving {
+        background-color: #2196f3;
+        color: white;
+      }
+
+      .save-indicator.warning {
+        background-color: #ff9800;
+        color: white;
+      }
+
+      .spinner {
+        display: inline-block;
+        width: 12px;
+        height: 12px;
+        border: 2px solid rgba(255, 255, 255, 0.3);
+        border-radius: 50%;
+        border-top-color: white;
+        animation: spin 1s ease-in-out infinite;
+        margin-right: 8px;
+      }
+
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+
+      .fade-in {
+        animation: fadeIn 0.3s ease;
+      }
+
+      @keyframes fadeIn {
+        from {
+          opacity: 0;
+          transform: translateY(-10px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      .auto-save-toggle {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        display: flex;
+        align-items: center;
+        font-size: 12px;
+        color: #aaa;
+      }
+
+      .auto-save-toggle input[type="checkbox"] {
+        margin-right: 5px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="sidebar">
+        <h2>专辑列表</h2>
+        <input
+          type="text"
+          class="search-box"
+          id="album-search"
+          placeholder="搜索专辑..."
+        />
+        <ul class="album-list" id="album-list"></ul>
+        <button class="action-button primary" id="create-album-btn">
+          新建专辑
+        </button>
+      </div>
+      <div class="main-content">
+        <h1>专辑编辑</h1>
+        <div class="album-details" id="album-details">
+          <h2>选择一个专辑进行编辑</h2>
+          <div id="album-form" style="display: none">
+            <div class="auto-save-toggle">
+              <input type="checkbox" id="auto-save" checked />
+              <label for="auto-save">自动保存</label>
+            </div>
+            <input
+              type="text"
+              class="album-name-input"
+              id="album-name"
+              placeholder="专辑名称"
+            />
+            <input type="hidden" id="current-album-id" />
+
+            <h3>专辑歌曲</h3>
+            <ul class="song-list" id="album-song-list"></ul>
+
+            <div class="button-group">
+              <button class="action-button primary" id="save-album-btn">
+                保存专辑
+              </button>
+              <button class="action-button danger" id="delete-album-btn">
+                删除专辑
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="available-songs">
+          <h3>可用歌曲</h3>
+          <input
+            type="text"
+            class="search-box"
+            id="song-search"
+            placeholder="搜索歌曲..."
+          />
+          <ul class="song-list" id="available-song-list"></ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- 保存提示元素 -->
+    <div id="save-indicator" class="save-indicator">
+      <span class="spinner"></span>
+      <span id="save-message">保存中...</span>
+    </div>
+
+    <script>
+      document.addEventListener("DOMContentLoaded", function () {
+        // DOM元素
+        const albumList = document.getElementById("album-list");
+        const albumDetails = document.getElementById("album-details");
+        const albumForm = document.getElementById("album-form");
+        const albumName = document.getElementById("album-name");
+        const currentAlbumId = document.getElementById("current-album-id");
+        const albumSongList = document.getElementById("album-song-list");
+        const availableSongList = document.getElementById(
+          "available-song-list"
+        );
+        const saveAlbumBtn = document.getElementById("save-album-btn");
+        const deleteAlbumBtn = document.getElementById("delete-album-btn");
+        const createAlbumBtn = document.getElementById("create-album-btn");
+        const albumSearch = document.getElementById("album-search");
+        const songSearch = document.getElementById("song-search");
+        const saveIndicator = document.getElementById("save-indicator");
+        const saveMessage = document.getElementById("save-message");
+        const autoSaveToggle = document.getElementById("auto-save");
+
+        // 数据
+        let albums = {};
+        let allSongs = [];
+        let currentAlbumSongs = [];
+        let draggingElement = null;
+        let autoSaveTimeout = null;
+        let isAutoSaveEnabled = true;
+
+        // 显示保存提示
+        function showSaveIndicator(message, type = "success", duration = 2000) {
+          saveMessage.innerHTML =
+            type === "saving"
+              ? '<span class="spinner"></span>' + message
+              : message;
+          saveIndicator.className = `save-indicator ${type} show`;
+
+          setTimeout(() => {
+            saveIndicator.classList.remove("show");
+          }, duration);
+        }
+
+        // 防抖函数
+        function debounce(func, wait) {
+          return function executedFunction(...args) {
+            const later = () => {
+              clearTimeout(autoSaveTimeout);
+              func(...args);
+            };
+            clearTimeout(autoSaveTimeout);
+            autoSaveTimeout = setTimeout(later, wait);
+          };
+        }
+
+        // 自动保存专辑
+        const autoSaveAlbum = debounce(async function () {
+          if (!isAutoSaveEnabled || !currentAlbumId.value) return;
+
+          const albumId = currentAlbumId.value;
+          const newAlbumName = albumName.value.trim();
+
+          if (!newAlbumName) {
+            showSaveIndicator("请输入专辑名称", "warning");
+            return;
+          }
+
+          const songIds = currentAlbumSongs.map((song) => song.num);
+
+          try {
+            showSaveIndicator("正在自动保存...", "saving", 1000);
+
+            const response = await fetch(`/modify_album/${albumId}`, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                name: newAlbumName,
+                songs: songIds,
+              }),
+            });
+
+            if (!response.ok) {
+              throw new Error("自动保存失败");
+            }
+
+            // 更新本地数据
+            albums[albumId] = newAlbumName;
+            renderAlbumList(albums);
+
+            showSaveIndicator("已自动保存", "success", 1500);
+          } catch (error) {
+            console.error("自动保存失败:", error);
+            showSaveIndicator("自动保存失败", "error", 3000);
+          }
+        }, 1000);
+
+        // 加载所有专辑
+        async function loadAlbums() {
+          try {
+            const response = await fetch("/all_albums");
+            const data = await response.json();
+            albums = data;
+            renderAlbumList(albums);
+          } catch (error) {
+            console.error("加载专辑失败:", error);
+            showSaveIndicator("加载专辑失败", "error");
+          }
+        }
+
+        // 加载所有歌曲
+        async function loadAllSongs() {
+          try {
+            const response = await fetch("/album/all");
+            const data = await response.json();
+            allSongs = data.songs;
+            renderAvailableSongs(allSongs);
+          } catch (error) {
+            console.error("加载歌曲失败:", error);
+            showSaveIndicator("加载歌曲失败", "error");
+          }
+        }
+
+        // 加载特定专辑的歌曲
+        async function loadAlbumSongs(albumId) {
+          try {
+            const response = await fetch(`/album/${albumId}`);
+            const data = await response.json();
+            currentAlbumSongs = data.songs;
+            renderAlbumSongs(currentAlbumSongs);
+            renderAvailableSongs(allSongs);
+          } catch (error) {
+            console.error("加载专辑歌曲失败:", error);
+            showSaveIndicator("加载专辑歌曲失败", "error");
+          }
+        }
+
+        // 渲染专辑列表
+        function renderAlbumList(albums) {
+          albumList.innerHTML = "";
+          for (const [id, name] of Object.entries(albums)) {
+            const li = document.createElement("li");
+            li.textContent = name;
+            li.classList.add("album-item");
+            li.dataset.id = id;
+            li.addEventListener("click", () => selectAlbum(id));
+            albumList.appendChild(li);
+          }
+        }
+
+        // 渲染专辑歌曲
+        function renderAlbumSongs(songs) {
+          albumSongList.innerHTML = "";
+          songs.forEach((song, index) => {
+            const li = document.createElement("li");
+            li.classList.add("song-item");
+            li.dataset.id = song.num;
+
+            const handle = document.createElement("span");
+            handle.classList.add("song-handle");
+            handle.textContent = "☰";
+            handle.addEventListener("mousedown", startDrag);
+
+            const songInfo = document.createElement("span");
+            songInfo.textContent = `${song.name} - ${song.musician}`;
+
+            const removeBtn = document.createElement("button");
+            removeBtn.classList.add("remove-song");
+            removeBtn.textContent = "移除";
+            removeBtn.addEventListener("click", () => removeSong(song.num));
+
+            li.appendChild(handle);
+            li.appendChild(songInfo);
+            li.appendChild(removeBtn);
+            albumSongList.appendChild(li);
+          });
+        }
+
+        // 渲染可用歌曲
+        function renderAvailableSongs(songs) {
+          availableSongList.innerHTML = "";
+          songs.forEach((song) => {
+            const isInAlbum = currentAlbumSongs.some((s) => s.num === song.num);
+            if (!isInAlbum) {
+              const li = document.createElement("li");
+              li.classList.add("song-item");
+              li.dataset.id = song.num;
+
+              const songInfo = document.createElement("span");
+              songInfo.textContent = `${song.name} - ${song.musician}`;
+
+              const addBtn = document.createElement("button");
+              addBtn.classList.add("add-song");
+              addBtn.textContent = "添加";
+              addBtn.addEventListener("click", () => addSongToAlbum(song));
+
+              li.appendChild(songInfo);
+              li.appendChild(addBtn);
+              availableSongList.appendChild(li);
+            }
+          });
+        }
+
+        // 选择专辑
+        function selectAlbum(albumId) {
+          if (albumId === "all") return;
+
+          document.querySelectorAll(".album-item").forEach((item) => {
+            item.classList.remove("active");
+          });
+
+          const selectedItem = document.querySelector(
+            `.album-item[data-id="${albumId}"]`
+          );
+          if (selectedItem) {
+            selectedItem.classList.add("active");
+          }
+
+          albumForm.style.display = "block";
+          albumDetails.querySelector("h2").style.display = "none";
+
+          currentAlbumId.value = albumId;
+          albumName.value = albums[albumId];
+
+          loadAlbumSongs(albumId);
+        }
+
+        // 添加歌曲到专辑
+        function addSongToAlbum(song) {
+          if (!currentAlbumSongs.some((s) => s.num === song.num)) {
+            currentAlbumSongs.push(song);
+            renderAlbumSongs(currentAlbumSongs);
+            renderAvailableSongs(allSongs);
+            if (isAutoSaveEnabled && currentAlbumId.value) {
+              autoSaveAlbum();
+            }
+          }
+        }
+
+        // 从专辑移除歌曲
+        function removeSong(songId) {
+          currentAlbumSongs = currentAlbumSongs.filter(
+            (song) => song.num !== songId
+          );
+          renderAlbumSongs(currentAlbumSongs);
+          renderAvailableSongs(allSongs);
+          if (isAutoSaveEnabled && currentAlbumId.value) {
+            autoSaveAlbum();
+          }
+        }
+
+        // 保存专辑（手动保存）
+        async function saveAlbum() {
+          const albumId = currentAlbumId.value;
+          const newAlbumName = albumName.value.trim();
+
+          if (!newAlbumName) {
+            showSaveIndicator("请输入专辑名称", "warning");
+            return;
+          }
+
+          const songIds = currentAlbumSongs.map((song) => song.num);
+
+          try {
+            showSaveIndicator("正在保存...", "saving");
+
+            if (albumId) {
+              const response = await fetch(`/modify_album/${albumId}`, {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                  name: newAlbumName,
+                  songs: songIds,
+                }),
+              });
+
+              if (!response.ok) {
+                throw new Error("更新专辑失败");
+              }
+
+              albums[albumId] = newAlbumName;
+              renderAlbumList(albums);
+              showSaveIndicator("专辑更新成功", "success");
+            } else {
+              const response = await fetch(
+                `/create_album/${encodeURIComponent(newAlbumName)}`
+              );
+
+              if (!response.ok) {
+                throw new Error("创建专辑失败");
+              }
+
+              const data = await response.json();
+              showSaveIndicator("专辑创建成功", "success");
+
+              loadAlbums();
+              setTimeout(() => {
+                selectAlbum(data.num);
+              }, 100);
+            }
+          } catch (error) {
+            console.error("保存专辑失败:", error);
+            showSaveIndicator("保存专辑失败: " + error.message, "error", 3000);
+          }
+        }
+
+        // 删除专辑
+        async function deleteAlbum() {
+          const albumId = currentAlbumId.value;
+          if (!albumId) {
+            showSaveIndicator("请先选择一个专辑", "warning");
+            return;
+          }
+
+          if (!confirm("确定要删除这个专辑吗？")) {
+            return;
+          }
+
+          try {
+            const response = await fetch(`/delete_album/${albumId}`);
+
+            if (!response.ok) {
+              throw new Error("删除专辑失败");
+            }
+
+            showSaveIndicator("专辑删除成功", "success");
+
+            currentAlbumId.value = "";
+            albumName.value = "";
+            currentAlbumSongs = [];
+            renderAlbumSongs([]);
+            albumForm.style.display = "none";
+            albumDetails.querySelector("h2").style.display = "block";
+
+            loadAlbums();
+          } catch (error) {
+            console.error("删除专辑失败:", error);
+            showSaveIndicator("删除专辑失败: " + error.message, "error", 3000);
+          }
+        }
+
+        // 新建专辑
+        function createNewAlbum() {
+          document.querySelectorAll(".album-item").forEach((item) => {
+            item.classList.remove("active");
+          });
+
+          currentAlbumId.value = "";
+          albumName.value = "";
+          currentAlbumSongs = [];
+          renderAlbumSongs([]);
+          albumForm.style.display = "block";
+          albumDetails.querySelector("h2").style.display = "none";
+          albumName.focus();
+        }
+
+        // 搜索专辑
+        function searchAlbums(query) {
+          query = query.toLowerCase();
+          const filteredAlbums = {};
+
+          for (const [id, name] of Object.entries(albums)) {
+            if (name.toLowerCase().includes(query)) {
+              filteredAlbums[id] = name;
+            }
+          }
+
+          renderAlbumList(filteredAlbums);
+        }
+
+        // 搜索歌曲
+        function searchSongs(query) {
+          query = query.toLowerCase();
+          const filteredSongs = allSongs.filter(
+            (song) =>
+              song.name.toLowerCase().includes(query) ||
+              song.musician.toLowerCase().includes(query)
+          );
+
+          renderAvailableSongs(filteredSongs);
+        }
+
+        // 拖拽排序相关函数
+        function startDrag(e) {
+          draggingElement = e.target.closest(".song-item");
+          setTimeout(() => {
+            draggingElement.classList.add("dragging");
+          }, 0);
+
+          document.addEventListener("mousemove", drag);
+          document.addEventListener("mouseup", endDrag);
+        }
+
+        function drag(e) {
+          if (!draggingElement) return;
+          e.preventDefault();
+
+          const afterElement = getDragAfterElement(albumSongList, e.clientY);
+          const songList = draggingElement.parentElement;
+
+          if (afterElement) {
+            songList.insertBefore(draggingElement, afterElement);
+          } else {
+            songList.appendChild(draggingElement);
+          }
+        }
+
+        function endDrag() {
+          if (!draggingElement) return;
+
+          draggingElement.classList.remove("dragging");
+
+          updateSongOrder();
+
+          draggingElement = null;
+          document.removeEventListener("mousemove", drag);
+          document.removeEventListener("mouseup", endDrag);
+
+          if (isAutoSaveEnabled && currentAlbumId.value) {
+            autoSaveAlbum();
+          }
+        }
+
+        function getDragAfterElement(container, y) {
+          const draggableElements = [
+            ...container.querySelectorAll(".song-item:not(.dragging)"),
+          ];
+
+          return draggableElements.reduce(
+            (closest, child) => {
+              const box = child.getBoundingClientRect();
+              const offset = y - box.top - box.height / 2;
+
+              if (offset < 0 && offset > closest.offset) {
+                return { offset: offset, element: child };
+              } else {
+                return closest;
+              }
+            },
+            { offset: Number.NEGATIVE_INFINITY }
+          ).element;
+        }
+
+        function updateSongOrder() {
+          const songItems = albumSongList.querySelectorAll(".song-item");
+          const newOrder = [];
+
+          songItems.forEach((item) => {
+            const songId = item.dataset.id;
+            const song = currentAlbumSongs.find((s) => s.num === songId);
+            if (song) {
+              newOrder.push(song);
+            }
+          });
+
+          currentAlbumSongs = newOrder;
+        }
+
+        // 事件监听
+        saveAlbumBtn.addEventListener("click", saveAlbum);
+        deleteAlbumBtn.addEventListener("click", deleteAlbum);
+        createAlbumBtn.addEventListener("click", createNewAlbum);
+        albumSearch.addEventListener("input", (e) =>
+          searchAlbums(e.target.value)
+        );
+        songSearch.addEventListener("input", (e) =>
+          searchSongs(e.target.value)
+        );
+
+        // 自动保存相关事件
+        albumName.addEventListener("input", () => {
+          if (isAutoSaveEnabled && currentAlbumId.value) {
+            autoSaveAlbum();
+          }
+        });
+
+        autoSaveToggle.addEventListener("change", (e) => {
+          isAutoSaveEnabled = e.target.checked;
+          if (isAutoSaveEnabled) {
+            showSaveIndicator("自动保存已开启", "success", 1500);
+          } else {
+            showSaveIndicator("自动保存已关闭", "warning", 1500);
+          }
+        });
+
+        // 初始化
+        loadAlbums();
+        loadAllSongs();
+      });
+    </script>
+  </body>
+</html>

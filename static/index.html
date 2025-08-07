@@ -138,7 +138,7 @@
       transition: 1s ease;
     }
 
-    #menu{
+    .menu{
       height: 100%;
       display: flex;
       flex-direction: column;
@@ -224,7 +224,7 @@
       width: 80%;
     }
 
-    #Tool{
+    .Tool{
       width: 70%;
       display: flex;
       align-items: center;
@@ -233,7 +233,7 @@
       margin: 10px;
     }
 
-    #SongList {
+    .List {
       height: 75%;
       width: 80%;
       overflow: auto;
@@ -288,6 +288,25 @@
     .pointer{
       cursor: pointer;
     }
+    
+    #search-box {
+        width: 75%;
+        padding: 10px;
+        font-size: 16px;
+        border: 2px solid #a7a7a7;
+        border-radius: 5px;
+    }
+
+    #album_menu{
+      height: 80%;
+      width: 100%;
+      position: fixed;
+      box-shadow: black 0px 10px 20px 0px, black inset -20px 0 20px -20px;
+      border-bottom-left-radius: 25px;
+      border-bottom-right-radius: 25px;
+      transition: 1s cubic-bezier(0, 0, 0.2, 1);
+      transform: translateY(-120%);
+    }
   </style>
   <style>
     .tooltip .tooltiptext {
@@ -321,7 +340,7 @@
     <div id="all">
       <!-- Thanks https://feathericons.com -->
       <img id="SidebarButton" src="/icon/sidebar.svg" alt="sidebar" />
-      <div id="menu">
+      <div id="menu" class="menu">
         <div class="tooltip" id="Tip"><img src="/icon/compass.svg" alt="compass"><span class="tooltiptext">按E / M : 打开菜单<br>按← / → : 切换歌曲<br>按↑ / ↓ : 控制音量<br>按P : 开启小窗</span></div>
         <div style="height: 70px"></div>
         <div id="LeftControl">
@@ -337,9 +356,9 @@
         <div 
           style="height: 20px;width: 90%;border-bottom: 2px solid #a7a7a7">
         </div>
-        <div id="Tool">
-          <a class="pointer" href="/file/add" target="_blank" title="Upload Music"><img id="upload-cloud" src="/icon/upload-cloud.svg" alt="upload-cloud" /></a>
-          <img id="PiP" class="pointer" src="/icon/monitor.svg" alt="monitor" title="PiP"/>
+        <div id="Tool" class="Tool">
+          <img id="openAlbumMenu" class="pointer" src="/icon/box.svg" alt="OpenAlbumMenu" title="OpenAlbumMenu"/>
+          <img id="PiP" class="pointer" src="/icon/monitor.svg" alt="PiP" title="PiP"/>
           <img id="playMode" class="pointer" src="/icon/arrow-right.svg" alt="PlayMode" title="PlayMode"/>
         </div>
         <div 
@@ -348,7 +367,7 @@
         <div 
           style="height: 20px">
         </div>
-        <div id="SongList"></div>
+        <div id="SongList" class="List"></div>
         <div 
           style="height: 20px;width: 90%;border-bottom: 2px solid #a7a7a7">
         </div>
@@ -359,6 +378,22 @@
           </div>
           <img id="volume-2" class="pointer" src="/icon/volume-2.svg" alt="volume-2" />
         </div>
+      <div id="album_menu" class="menu">
+        <div style="height: 70px"></div>
+        <input type="text" id="search-box" placeholder="搜索歌曲...">
+        <div 
+          style="height: 10px;width: 90%;border-bottom: 2px solid #a7a7a7">
+        </div>
+        <div id="AlbumList" class="List"></div>
+        <div 
+          style="height: 20px;width: 90%;border-bottom: 2px solid #a7a7a7">
+        </div>
+        <div id="Tool2" class="Tool">
+          <img id="Back" class="pointer" src="/icon/chevrons-up.svg" alt="chevrons-up" />
+          <a class="pointer" href="/file/add" target="_blank" title="Upload Music"><img id="upload-cloud" src="/icon/upload-cloud.svg" alt="upload-cloud" /></a>
+          <a class="pointer" href="/file/Edit_album" target="_blank" title="Upload Music"><img id="upload-cloud" src="/icon/inbox.svg" alt="inbox" /></a>
+        </div>
+      </div>
       </div>
 
       <div id="area">
@@ -389,12 +424,15 @@
     <script>
       let allowed = false;
       let BarOpened = false;
+      let AlbumMenuOpened = false;
       let PlayMode = "Sequential";
       const audioContext = new (window.AudioContext ||
         window.webkitAudioContext)();
-      let currentSongIndex = 0;
+      let currentSongIndex = -1;
+      let currentAlbum = "all";
       var audio = new Audio();
       let songList = [];
+      let all_albums = {};
 
       const prevButton = document.getElementById("prevButton");
       const playPauseButton = document.getElementById("playPauseButton");
@@ -423,6 +461,11 @@
       const MArea = document.getElementById("music_area");
       const Area = document.getElementById("area");
       const Volume = document.getElementById("Volume");
+      const album_menu = document.getElementById("album_menu");
+      const Back = document.getElementById("Back");
+      const albumList = document.getElementById("AlbumList");
+      const searchBox = document.getElementById("search-box");
+      const openAlbumMenu = document.getElementById("openAlbumMenu");
 
       var PiPNow = false
       let pipWindow
@@ -470,8 +513,12 @@
         fetch(`/album/${albumNum}`)
           .then((response) => response.json())
           .then((data) => {
-            songList = data;
-            loadSong(songList[currentSongIndex].num);
+            setCookie();
+            songList = data.songs;
+            if (currentSongIndex == -1) {
+              currentSongIndex = 0;
+              loadSong(songList[currentSongIndex].num);
+            }
             SongList.innerHTML=""
             for (let i = 0; i < songList.length; i++) {
               Item=document.createElement("div")
@@ -488,7 +535,7 @@
             console.error("Failed to fetch initial song list:", error)
           );
       }
-      loadAlbum("all");
+      //loadAlbum("all");
 
       function loadSong(songNum) {
         fetch(`/name/${songNum}`)
@@ -544,51 +591,15 @@
 
       function togglePlayPause() {
         allowed = true;
-        const gainNode = audioContext.createGain();
-        const currentVolume = audioContext.createGain();
-        currentVolume.gain.value = audio.volume;
 
         if (audio.paused) {
           audioContext.resume().then(() => {
             audio.play();
             playPauseButton.src = "/icon/pause.svg";
-            fadeAudio(gainNode, currentVolume, 0, 1, 0.3);
           });
         } else {
-          fadeAudio(gainNode, currentVolume, 1, 0, 0.3, () => {
-            audio.pause();
-            playPauseButton.src = "/icon/play.svg";
-            gainNode.disconnect();
-          });
-        }
-      }
-
-      function fadeAudio(
-        gainNode,
-        currentVolume,
-        startVolume,
-        endVolume,
-        duration,
-        callback
-      ) {
-        gainNode.gain.setValueAtTime(
-          currentVolume.gain.value,
-          audioContext.currentTime
-        );
-        gainNode.gain.linearRampToValueAtTime(
-          startVolume,
-          audioContext.currentTime
-        );
-        gainNode.gain.linearRampToValueAtTime(
-          endVolume,
-          audioContext.currentTime + duration
-        );
-
-        gainNode.connect(audioContext.destination);
-        currentVolume.connect(gainNode);
-
-        if (callback) {
-          setTimeout(callback, duration * 1000);
+          audio.pause();
+          playPauseButton.src = "/icon/play.svg";
         }
       }
 
@@ -623,14 +634,16 @@
         loadSong(songList[currentSongIndex].num);
       }
 
+      const analyser = audioContext.createAnalyser();
+      const gainNode = audioContext.createGain();
+      const context = visualizer.getContext("2d");
+      const dataArray = new Uint8Array(analyser.frequencyBinCount);
       function updateVisualizer() {
-        const analyser = audioContext.createAnalyser();
-        const context = visualizer.getContext("2d");
-        const dataArray = new Uint8Array(analyser.frequencyBinCount);
 
         const source = audioContext.createMediaElementSource(audio);
         source.connect(analyser);
-        analyser.connect(audioContext.destination);
+        analyser.connect(gainNode);
+        gainNode.connect(audioContext.destination);
 
         analyser.fftSize = 512;
         
@@ -719,6 +732,22 @@
         }
         draw();
       }
+      updateVisualizer();
+
+      function setVolume(volume) {
+        gainNode.gain.value = volume;
+        var percentage = gainNode.gain.value * 100;
+        Vprogress.style.width = percentage + "%";
+        Volume.innerText = Math.round(percentage) + "%";
+        Volume.style.opacity = "1";
+        
+        setCookie()
+
+        clearTimeout(VolumeTipTimeOut);
+        VolumeTipTimeOut = setTimeout(() => {
+          Volume.style.opacity = "0";
+        },1000)
+      }
 
       function formatTime(seconds) {
         const minutes = Math.floor(seconds / 60)
@@ -736,11 +765,16 @@
 
       function OpenSidebar() {
         if (BarOpened) {
-          BarOpened = false;
-          menu.style.transform = `translateX(-${MenuWidth})`;
-          music_area.style.left = "0";
-          SidebarButton.style["background-color"] = "rgba(160, 160, 160, 0)";
-          Tip.style.opacity = "0";
+          if (AlbumMenuOpened){
+            OpenAlbumMenu();
+          }
+          else{
+            BarOpened = false;
+            menu.style.transform = `translateX(-${MenuWidth})`;
+            music_area.style.left = "0";
+            SidebarButton.style["background-color"] = "rgba(160, 160, 160, 0)";
+            Tip.style.opacity = "0";
+          }
         } else {
           BarOpened = true;
           menu.style.transform = "translateX(0px)";
@@ -751,6 +785,64 @@
           Tip.style.opacity = "1";
         }
       }
+
+      function renderAlbumList(albums) {
+        albumList.innerHTML = '';
+        for (const [id, name] of Object.entries(albums)) {
+            Item=document.createElement("div")
+            Item.classList=["MusicBox"]
+            Item.innerHTML = `<div class="MusicItem scroll-wrap"><div class="normal scroll-item ">${name}</div></div>`;
+            Item.addEventListener("click", () => {
+                currentAlbum = id;
+                loadAlbum(id);
+            });
+            albumList.appendChild(Item);
+        }
+      }
+
+      async function showAlbums() {
+        try {
+          const response = await fetch('/all_albums');
+          const data = await response.json();
+          all_albums = data;
+          renderAlbumList(all_albums);
+        } catch (error) {
+          console.error('加载专辑失败:', error);
+        }
+      }
+
+      function OpenAlbumMenu() {
+        if (AlbumMenuOpened) {
+          AlbumMenuOpened = false;
+          album_menu.style.transform = "translateY(-120%)";
+        } else {
+          AlbumMenuOpened = true;
+          if(!BarOpened){
+            OpenSidebar();
+            setTimeout(() => {
+              showAlbums();
+              album_menu.style.transform = "translateY(0px)";
+            }, 500);
+          } else {
+            showAlbums();
+            album_menu.style.transform = "translateY(0px)";
+          }
+        }
+      }
+
+      async function searchAlbums(query) {
+          query = query.toLowerCase();
+          const filteredAlbums = {};
+
+          for (const [id, name] of Object.entries(all_albums)) {
+              if (name.toLowerCase().includes(query)) {
+                  filteredAlbums[id] = name;
+              }
+          }
+
+          renderAlbumList(filteredAlbums);
+      }
+      searchBox.addEventListener('input', e => searchAlbums(e.target.value));
 
       // 更新进度条
       audio.addEventListener("timeupdate", function () {
@@ -768,7 +860,9 @@
         var TprogressBarRect = TprogressBar.getBoundingClientRect();
         var clickPosition = e.clientX - TprogressBarRect.left;
         var newTime = (clickPosition / TprogressBarRect.width) * audio.duration;
+        newTime = newTime.toFixed(2);
         audio.currentTime = newTime;
+        console.log(newTime, audio.duration);
       }
 
       function TonMouseUp() {
@@ -777,20 +871,6 @@
       }
 
       Vprogress.style.width="100%"
-
-      audio.addEventListener("volumechange", function () {
-        var percentage = audio.volume * 100;
-        Vprogress.style.width = percentage + "%";
-        Volume.innerText = Math.round(percentage) + "%";
-        Volume.style.opacity = "1";
-        
-        setCookie()
-
-        clearTimeout(VolumeTipTimeOut);
-        VolumeTipTimeOut = setTimeout(() => {
-          Volume.style.opacity = "0";
-        },1000)
-      });
 
       // 拖动音量条
       VprogressBar.addEventListener("mousedown", function (e) {
@@ -804,7 +884,7 @@
         var newVolume = clickPosition / VprogressBarRect.width;
         if (newVolume < 0) newVolume = 0;
         if (newVolume > 1) newVolume = 1;
-        audio.volume = newVolume;
+        setVolume(newVolume);
       }
 
       function VonMouseUp() {
@@ -814,40 +894,47 @@
 
       // 获取Cookie值
       function getCookie() {
-        console.log(document.cookie)
-          let cookieArray = document.cookie.split('; ');
-          let cookiePair;
-          for (let i = 0; i < cookieArray.length; i++) {
-              cookiePair = cookieArray[i].split('=');
-              if (cookiePair[0] === "Volume") {
-                  audio.volume = decodeURIComponent(cookiePair[1]);
-                  return ;
-              }
+        let cookieArray = document.cookie.split('; ');
+        let cookiePair;
+        setVolume(1);
+        for (let i = 0; i < cookieArray.length; i++) {
+          cookiePair = cookieArray[i].split('=');
+          if (cookiePair[0] === "Volume") {
+            setVolume(decodeURIComponent(cookiePair[1]));
           }
-          audio.volume=1
+          if (cookiePair[0] === "CurrentAlbum") {
+            currentAlbum = decodeURIComponent(cookiePair[1]);
+            loadAlbum(currentAlbum);
+          }
+        }
       }
 
       getCookie()
 
       // 设置Cookie值
       function setCookie() {
-          // 更新Cookie
-          let expires = "";
-          let date = new Date();
-          date.setTime(date.getTime() + (2592000000));//一个月
-          expires = "; expires=" + date.toUTCString();
-          document.cookie = "Volume" + "=" + "0." + encodeURIComponent(Math.round(audio.volume * 100)) + expires + "; path=/";
+        // 更新Cookie
+        let expires = "";
+        let date = new Date();
+        date.setTime(date.getTime() + (2592000000));//一个月
+        expires = "; expires=" + date.toUTCString();
+        // 存储音量信息
+        const volumeCookie = "Volume" + "=" + "0." + encodeURIComponent(Math.round(gainNode.gain.value * 100));
+        // 存储当前专辑信息
+        const currentAlbumCookie = "CurrentAlbum" + "=" + encodeURIComponent(currentAlbum);
+        // 同时设置两个 cookie
+        document.cookie = volumeCookie + expires + "; path=/";
+        document.cookie = currentAlbumCookie + expires + "; path=/";
       }
-
       SidebarButton.addEventListener("click", OpenSidebar);
+      Back.addEventListener("click", OpenAlbumMenu);
+      openAlbumMenu.addEventListener("click", OpenAlbumMenu);
 
       playPauseButton.addEventListener("click", togglePlayPause);
       nextButton.addEventListener("click", playNextSong);
       prevButton.addEventListener("click", playPrevSong);
       audio.addEventListener("ended", playNextSong);
 
-      audio.addEventListener("play", updateVisualizer);
-      audio.addEventListener("pause", () => cancelAnimationFrame(draw)); // Assuming you declared draw somewhere
       audio.addEventListener("timeupdate", function () {
         currentTime.textContent = formatTime(audio.currentTime);
         MusicTime.textContent = `${formatTime(audio.currentTime)}/${formatTime(
@@ -856,11 +943,11 @@
       });
 
       volume_x.addEventListener("click", function () {
-        audio.volume = 0;
+        setVolume(0);
       });
 
       volume_2.addEventListener("click", function () {
-        audio.volume = 1;
+        setVolume(1);
       });
 
       playMode.addEventListener("click", function () {
@@ -882,8 +969,8 @@
 
       let isCoolDown = false;
       let CoolDownTime = 1000;
-
-      document.addEventListener("keydown", function (event) {
+      
+      function KeyDown (event) {
         console.log(event.code);
         switch (event.code) {
           case "KeyM":
@@ -891,6 +978,9 @@
             break;
           case "KeyE":
             OpenSidebar();
+            break;
+          case "KeyA":
+            OpenAlbumMenu();
             break;
           case "Space":
             togglePlayPause();
@@ -918,19 +1008,38 @@
             playNextSong();
             break;
           case "ArrowUp":
-            var newVolume = audio.volume + 0.1;
+            var newVolume = gainNode.gain.value + 0.1;
             if (newVolume > 1) newVolume = 1;
-            audio.volume = newVolume;
+            setVolume(newVolume);
             break;
           case "ArrowDown":
-            var newVolume = audio.volume - 0.1;
+            var newVolume = gainNode.gain.value - 0.1;
             if (newVolume < 0) newVolume = 0;
-            audio.volume = newVolume;
+            setVolume(newVolume);
             break;
           default:
             break;
         }
-      });
+      }
+
+      function PiPKeyDown (event) {
+        switch (event.code) {
+          case "KeyM":
+            window.focus();
+            break;
+          case "KeyE":
+            window.focus();
+            break;
+          case "KeyA":
+            window.focus();
+            break;
+          default:
+            break;
+        }
+        KeyDown(event);
+      }
+
+      document.addEventListener("keydown", KeyDown);
 
       music_area.addEventListener("mouseenter", function() {
         isMouseOver = true;
@@ -942,23 +1051,26 @@
         //console.log("鼠标离开元素");
       });
 
-      document.addEventListener('wheel', function(event) {
+      function wheel(event) {
         if (isMouseOver) {
           // 获取滚动量
           let deltaY = event.deltaY; // 垂直滚动量
 
           // 判断滚动方向
           if (deltaY > 0) {
-            var newVolume = audio.volume - 0.01;
+            var newVolume = gainNode.gain.value - 0.01;
             if (newVolume < 0) newVolume = 0;
-            audio.volume = newVolume;
+            setVolume(newVolume);
           } else if (deltaY < 0) {
-            var newVolume = audio.volume + 0.01;
+            var newVolume = gainNode.gain.value + 0.01;
             if (newVolume > 1) newVolume = 1;
-            audio.volume = newVolume;
+            setVolume(newVolume);
           }
         }
-      });
+      }
+
+      document.addEventListener('wheel', wheel);
+
       /*
       const divA = document.getElementById("music_area");
       const videoB = document.createElement('video');
@@ -1071,75 +1183,8 @@
 
             pipWindow.document.body.append(MArea);
             Area.innerHTML='<p id="tip" class="normal">Picture-in-Picture (PiP) playback</p>';
-            pipWindow.document.addEventListener("keydown", function (event) {
-              console.log("pip",event.code);
-              switch (event.code) {
-                case "KeyM":
-                  OpenSidebar();
-                  window.focus();
-                  break;
-                case "KeyE":
-                  OpenSidebar();
-                  window.focus();
-                  break;
-                case "Space":
-                  togglePlayPause();
-                  break;
-                case "ArrowLeft":
-                  if (isCoolDown) {
-                    return;
-                  }
-                  // 设置冷却状态，并在0.5秒后重置
-                  isCoolDown = true;
-                  setTimeout(function () {
-                    isCoolDown = false;
-                  }, CoolDownTime);
-                  playPrevSong();
-                  break;
-                case "ArrowRight":
-                  if (isCoolDown) {
-                    return;
-                  }
-                  // 设置冷却状态，并在0.5秒后重置
-                  isCoolDown = true;
-                  setTimeout(function () {
-                    isCoolDown = false;
-                  }, CoolDownTime);
-                  playNextSong();
-                  break;
-                case "ArrowUp":
-                  var newVolume = audio.volume + 0.1;
-                  if (newVolume > 1) newVolume = 1;
-                  audio.volume = newVolume;
-                  break;
-                case "ArrowDown":
-                  var newVolume = audio.volume - 0.1;
-                  if (newVolume < 0) newVolume = 0;
-                  audio.volume = newVolume;
-                  break;
-                case "KeyP":
-                  OpenPiP();
-                  break;
-                default:
-                  break;
-              }
-              
-            });
-            pipWindow.document.addEventListener('wheel', function(event) {
-              // 获取滚动量
-              let deltaY = event.deltaY; // 垂直滚动量
-
-              // 判断滚动方向
-              if (deltaY > 0) {
-                var newVolume = audio.volume - 0.01;
-                if (newVolume < 0) newVolume = 0;
-                audio.volume = newVolume;
-              } else if (deltaY < 0) {
-                var newVolume = audio.volume + 0.01;
-                if (newVolume > 1) newVolume = 1;
-                audio.volume = newVolume;
-              }
-            });
+            pipWindow.document.addEventListener("keydown", PiPKeyDown);
+            pipWindow.document.addEventListener('wheel', wheel);
           }
           
         }

@@ -67,6 +67,13 @@ async def get_index():
     print(f"访问次数：{time}")
     return FileResponse("static/index.html")
 
+@app.get("/", response_class=HTMLResponse)
+async def get_index():
+    global time
+    time += 1
+    print(f"访问次数：{time}")
+    return FileResponse("static/index.html")
+
 
 @app.get("/file/{page_name}", response_class=HTMLResponse)
 async def find_page(page_name: str):
@@ -150,10 +157,30 @@ async def information():
     return song_list
 
 
-@app.get("/all_albums")
+@app.get("/all_albums", response_model=Dict[str, str])
 async def all_albums():
-    albums = [file for file in os.listdir(album_path) if
-              file.lower().endswith(".json") and os.path.isfile(os.path.join(album_path, file))]
+    albums = {"all": "全部"}
+    for file in os.listdir(album_path):
+        if file.lower().endswith(".json") and os.path.isfile(os.path.join(album_path, file)):
+            # 提取album编号（去掉.json后缀）
+            album_num = file[:-5]  # 去掉最后的.json
+            
+            # 读取album文件内容
+            path = os.path.join(album_path, file)
+            with open(path, "r", encoding="utf-8") as f:
+                album_data = json.load(f)
+            try:
+                # 提取album名称
+                if isinstance(album_data, dict) and "name" in album_data:
+                    album_name = album_data["name"]
+                else:
+                    # 对于旧格式的album文件，使用默认名称
+                    album_name = "未命名专辑"
+            except json.JSONDecodeError:
+                album_name = "无效的专辑文件"
+            
+            # 以num为键，name为值
+            albums[album_num] = album_name
     return albums
 
 def get_song(songList):
@@ -168,14 +195,82 @@ def get_song(songList):
                 raise e
     return song_list
 
-@app.get("/album/{num}", response_model=List[Dict[str, str]])
+@app.get("/album/{num}", response_model=Dict[str, object])
 async def get_album(num: str):
     if num == "all":
-        return get_song(os.listdir(music_path))
+        return {
+            "name": "全部",
+            "songs": get_song(os.listdir(music_path))
+        }
     path = os.path.join(album_path, f"{num}.json")
+    if not os.path.exists(path):
+        raise HTTPException(status_code=404, detail="专辑未找到")
     with open(path, "r", encoding="utf-8") as file:
         album = json.load(file)
-    return get_song(album)
+    album["songs"] = get_song(album.get("songs", []))
+    return album
+
+@app.post("/modify_album/{num}", response_model=Dict[str, str])
+async def modify_album(num: str, album: dict):
+    name = album["name"]
+    songs = album["songs"]
+
+    path = os.path.join(album_path, f"{num}.json")
+    
+    # 检查专辑是否存在
+    if not os.path.exists(path):
+        raise HTTPException(status_code=404, detail="专辑不存在")
+    
+    # 检查所有歌曲是否存在
+    for song_num in songs:
+        if not os.path.isdir(os.path.join(music_path, song_num)):
+            raise HTTPException(status_code=404, detail=f"歌曲 {song_num} 不存在")
+    
+    # 更新专辑文件
+    with open(path, "w", encoding="utf-8") as file:
+        json.dump({"name": name, "songs": songs}, file, ensure_ascii=False, indent=4)
+    
+    return {"message": "SUCCESS", "num": num}
+
+@app.get("/create_album/{album_name}", response_model=Dict[str, str])
+async def create_album(album_name: str):
+    new_album_num = str(uuid.uuid4())[:8]  # 使用UUID的前8个字符作为编号
+    
+    # 检查是否有重复的编号
+    while os.path.exists(os.path.join(album_path, f"{new_album_num}.json")):
+        new_album_num = str(uuid.uuid4())[:8]
+
+    # 创建album文件
+    path = os.path.join(album_path, f"{new_album_num}.json")
+    with open(path, "w", encoding="utf-8") as file:
+        # 存储专辑名称和歌曲列表
+        album_data = {
+            "name": album_name,
+            "songs": []
+        }
+        json.dump(album_data, file, ensure_ascii=False, indent=4)
+    
+    return {
+        "message": "SUCCESS", 
+        "num": new_album_num, 
+        "name": album_name
+    }
+
+@app.get("/delete_album/{num}", response_model=Dict[str, str])
+async def delete_album(num: str):
+    # 构建专辑文件路径
+    path = os.path.join(album_path, f"{num}.json")
+    
+    # 检查专辑是否存在
+    if not os.path.exists(path):
+        raise HTTPException(status_code=404, detail="专辑不存在")
+    
+    # 删除专辑文件
+    try:
+        os.remove(path)
+        return {"message": "SUCCESS", "num": num}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"删除专辑时出错: {str(e)}")
 
 @app.post("/add_music")
 async def add_music(
