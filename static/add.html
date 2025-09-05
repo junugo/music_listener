@@ -59,7 +59,8 @@
         }
 
         input[type="text"],
-        input[type="file"] {
+        input[type="file"],
+        input[type="url"] {
             width: 100%;
             padding: 12px 15px;
             background-color: #3a3a3a;
@@ -70,7 +71,8 @@
             transition: all 0.3s ease;
         }
 
-        input[type="text"]:focus {
+        input[type="text"]:focus,
+        input[type="url"]:focus {
             outline: none;
             background-color: #4a4a4a;
             box-shadow: 0 0 0 2px rgba(0, 140, 186, 0.3);
@@ -177,6 +179,57 @@
             padding-top: 0;
             margin-top: 0;
         }
+        
+        .tab-container {
+            display: flex;
+            margin-bottom: 20px;
+        }
+
+        .tab {
+            flex: 1;
+            padding: 12px;
+            text-align: center;
+            background-color: #3a3a3a;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border-radius: 8px 8px 0 0;
+        }
+
+        .tab:first-child {
+            border-right: 1px solid #2a2a2a;
+        }
+
+        .tab.active {
+            background-color: #008cba;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+        
+        .url-info {
+            margin-top: 10px;
+            border-radius: 8px;
+            font-size: 14px;
+            display: none;
+        }
+
+        .url-info.show {
+            display: block;
+        }
+
+        .url-info-title {
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .url-info-content {
+            color: #aaa;
+        }
 
         @media (max-width: 600px) {
             .upload-container {
@@ -196,44 +249,83 @@
     <div class="upload-container">
         <h1>上传新歌曲</h1>
         
-        <form action="/add_music" method="post" enctype="multipart/form-data" id="upload-form">
-            <div class="form-section">
-                <div class="form-group">
-                    <label for="music_file">音乐文件</label>
-                    <input type="file" name="music_file" required>
-                </div>
-                
-                <div class="form-group">
-                    <label for="image_file">封面图片</label>
-                    <input type="file" name="image_file" required>
-                </div>
-            </div>
-            
-            <div class="form-section">
-                <div class="form-group">
-                    <label for="song_name">歌曲名称</label>
-                    <input type="text" name="song_name" placeholder="请输入歌曲名称" required>
-                </div>
-                
-                <div class="form-group">
-                    <label for="composer">作曲家/艺术家</label>
-                    <input type="text" name="composer" placeholder="请输入作曲家或艺术家名称" required>
-                </div>
-            </div>
-            
-            <button type="submit" class="upload-button">上传歌曲</button>
-        </form>
+        <div class="tab-container">
+            <div class="tab active" data-tab="file-upload">文件上传</div>
+            <div class="tab" data-tab="url-import">链接导入</div>
+        </div>
         
-        <div class="upload-progress" id="upload-progress">
-            <div>正在上传...</div>
-            <div class="progress-bar">
-                <div class="progress-fill" id="progress-fill"></div>
+        <!-- 文件上传表单 -->
+        <div id="file-upload" class="tab-content active">
+            <form action="/add_music" method="post" enctype="multipart/form-data" id="upload-form">
+                <div class="form-section">
+                    <div class="form-group">
+                        <label for="music_file">音乐文件</label>
+                        <input type="file" name="music_file" id="music_file" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="image_file">封面图片</label>
+                        <input type="file" name="image_file" id="image_file" required>
+                    </div>
+                </div>
+                
+                <div class="form-section">
+                    <div class="form-group">
+                        <label for="song_name">歌曲名称</label>
+                        <input type="text" name="song_name" id="song_name" placeholder="请输入歌曲名称" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="composer">作曲家/艺术家</label>
+                        <input type="text" name="composer" id="composer" placeholder="请输入作曲家或艺术家名称" required>
+                    </div>
+                </div>
+                
+                <button type="submit" class="upload-button">上传歌曲</button>
+            </form>
+            
+            <div class="upload-progress" id="upload-progress">
+                <div>正在上传...</div>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progress-fill"></div>
+                </div>
+                <div id="upload-status">准备上传...</div>
             </div>
-            <div id="upload-status">准备上传...</div>
+        </div>
+        
+        <!-- 链接导入表单 -->
+        <div id="url-import" class="tab-content">
+            <form id="urlForm">
+                <div class="form-group">
+                    <label for="contentUrl">输入Bilibili视频链接</label>
+                    <input type="url" id="contentUrl" name="url" placeholder="https://www.bilibili.com/video/..." required>
+                </div>
+                <div class="upload-progress">
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="urlProgressFill"></div>
+                    </div>
+                    <div id="urlProgressText">处理中... 0%</div>
+                </div>
+            
+                <!-- 解析结果显示区域 -->
+                <div id="parseResult" class="url-info">
+                    <div class="form-group">
+                        <label for="parsedTitle">标题</label>
+                        <input type="text" id="parsedTitle" name="title">
+                    </div>
+                    <div class="form-group">
+                        <label for="parsedAuthor">作者</label>
+                        <input type="text" id="parsedAuthor" name="author">
+                    </div>
+                </div>
+                <button type="button" id="parseButton" class="upload-button">解析</button>
+                <button type="submit" id="importButton" class="upload-button" style="display: none; margin-top: 15px;">导入</button>
+            </form>
         </div>
     </div>
 
     <script>
+        // 文件上传表单处理
         const form = document.getElementById('upload-form');
         const uploadProgress = document.getElementById('upload-progress');
         const progressFill = document.getElementById('progress-fill');
@@ -279,12 +371,141 @@
         document.querySelectorAll('input[type="file"]').forEach(input => {
             input.addEventListener('change', function(e) {
                 const fileName = e.target.files[0]?.name || '';
-                const fileInfo = e.target.nextElementSibling;
+                const fileInfo = e.target.nextElementSibling || document.createElement('div');
+                if (!e.target.nextElementSibling) {
+                    fileInfo.className = 'file-info';
+                    e.target.parentNode.appendChild(fileInfo);
+                }
                 if (fileName) {
                     fileInfo.textContent = `已选择: ${fileName}`;
                 }
             });
         });
+        
+        // 标签页切换功能
+        const tabs = document.querySelectorAll('.tab');
+        const tabContents = document.querySelectorAll('.tab-content');
+        
+        tabs.forEach(tab => {
+            tab.addEventListener('click', () => {
+                const tabId = tab.getAttribute('data-tab');
+                
+                // 更新标签状态
+                tabs.forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+                
+                // 更新内容显示
+                tabContents.forEach(content => {
+                    content.classList.remove('active');
+                    if (content.id === tabId) {
+                        content.classList.add('active');
+                    }
+                });
+            });
+        });
+        
+        // 解析按钮功能
+         const parseButton = document.getElementById('parseButton');
+         const importButton = document.getElementById('importButton');
+         const parseResult = document.getElementById('parseResult');
+         const urlProgressFill = document.getElementById('urlProgressFill');
+         const urlProgressText = document.getElementById('urlProgressText');
+          
+         parseButton.addEventListener('click', () => {
+             const url = document.getElementById('contentUrl').value;
+             if (!url) {
+                 alert('请输入有效的Bilibili链接');
+                 return;
+             }
+              
+             // 显示进度条
+             document.querySelector('#url-import .upload-progress').style.display = 'block';
+             urlProgressText.textContent = '解析中...';
+             urlProgressFill.style.width = '0%';
+             parseResult.classList.remove('show');
+             importButton.style.display = 'none';
+              
+             // 调用解析API - 改为使用FormData
+             const formData = new FormData();
+             formData.append('url', url);
+              
+             fetch('/parse_content', {
+                 method: 'POST',
+                 body: formData
+             })
+             .then(response => {
+                 if (!response.ok) {
+                     throw new Error('解析失败，请检查链接是否正确');
+                 }
+                 return response.json();
+             })
+             .then(data => {
+                 // 显示解析结果
+                 parseResult.classList.add('show');
+                 document.getElementById('parsedTitle').value = data.song_name || '未知标题';
+                 document.getElementById('parsedAuthor').value = data.composer || '未知作者';
+                  
+                 // 显示导入按钮，隐藏解析按钮
+                 importButton.style.display = 'block';
+                 parseButton.style.display = 'none';
+                 urlProgressFill.style.width = '100%';
+                 urlProgressText.textContent = '解析完成';
+             })
+             .catch(error => {
+                 console.error('Error:', error);
+                 urlProgressText.textContent = error.message || '解析失败';
+                 urlProgressFill.style.width = '100%';
+             });
+         });
+         
+         // 导入按钮功能
+         document.getElementById('urlForm').addEventListener('submit', (e) => {
+             e.preventDefault();
+              
+             const url = document.getElementById('contentUrl').value;
+             const title = document.getElementById('parsedTitle').value;
+             const author = document.getElementById('parsedAuthor').value;
+              
+             if (!url) {
+                 alert('请输入有效的Bilibili链接');
+                 return;
+             }
+              
+             urlProgressText.textContent = '导入中...';
+             urlProgressFill.style.width = '0%';
+             importButton.disabled = true;
+              
+             // 调用导入API - 改为使用FormData
+             const formData = new FormData();
+             formData.append('url', url);
+             formData.append('song_name', title);
+             formData.append('composer', author);
+              
+             fetch('/add_content_by_url', {
+                 method: 'POST',
+                 body: formData
+             })
+             .then(response => {
+                 if (!response.ok) {
+                     throw new Error('导入失败');
+                 }
+                 return response.json();
+             })
+             .then(data => {
+                 urlProgressFill.style.width = '100%';
+                 urlProgressText.textContent = '导入成功！';
+                 
+                 setTimeout(() => {
+                     window.location.href = '/';
+                 }, 1500);
+             })
+             .catch(error => {
+                 console.error('Error:', error);
+                 urlProgressText.textContent = error.message || '导入失败';
+                 urlProgressFill.style.width = '100%';
+                 importButton.disabled = false;
+             });
+         });
     </script>
 </body>
 </html>

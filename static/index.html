@@ -264,7 +264,7 @@
       bottom: 0;
     }
 
-    #Volume{
+    #Show{
       font-size: 32px;
       position: absolute;
       display: flex;
@@ -301,7 +301,7 @@
       height: 80%;
       width: 100%;
       position: fixed;
-      box-shadow: black 0px 10px 20px 0px, black inset -20px 0 20px -20px;
+      box-shadow: black 0px 20px 20px -10px, black inset -20px 0 20px -20px;
       border-bottom-left-radius: 25px;
       border-bottom-right-radius: 25px;
       transition: 1s cubic-bezier(0, 0, 0.2, 1);
@@ -341,7 +341,8 @@
       <!-- Thanks https://feathericons.com -->
       <img id="SidebarButton" src="/icon/sidebar.svg" alt="sidebar" />
       <div id="menu" class="menu">
-        <div class="tooltip" id="Tip"><img src="/icon/compass.svg" alt="compass"><span class="tooltiptext">按E / M : 打开菜单<br>按← / → : 切换歌曲<br>按↑ / ↓ : 控制音量<br>按P : 开启小窗</span></div>
+        <div class="tooltip" id="Tip"><img src="/icon/compass.svg" alt="compass"><span class="tooltiptext">按E / M : 打开菜单<br>按← / → : 切换歌曲<br>按↑ / ↓ : 控制音量<br>按P : 开启小窗<br>按A : 切换专辑<br>按S : 切换播放模式</span></div>
+
         <div style="height: 70px"></div>
         <div id="LeftControl">
           <!-- LeftControl简称LC =牢c -->
@@ -401,7 +402,7 @@
           <img id="background" src="" alt="Background Image">
           <div id="effects"></div>
 
-          <p class="normal" id="Volume">100%</p>
+          <p class="normal" id="Show">100%</p>
 
           <p class="normal" id="songTitle">songTitle</p>
 
@@ -433,6 +434,8 @@
       var audio = new Audio();
       let songList = [];
       let all_albums = {};
+      let playHistory = []; // 播放历史记录
+      let historyIndex = -1; // 当前在历史记录中的位置
 
       const prevButton = document.getElementById("prevButton");
       const playPauseButton = document.getElementById("playPauseButton");
@@ -460,7 +463,7 @@
       const effects = document.getElementById("effects");
       const MArea = document.getElementById("music_area");
       const Area = document.getElementById("area");
-      const Volume = document.getElementById("Volume");
+      const Show = document.getElementById("Show");
       const album_menu = document.getElementById("album_menu");
       const Back = document.getElementById("Back");
       const albumList = document.getElementById("AlbumList");
@@ -472,6 +475,8 @@
       var VolumeTipTimeOut
       
       let isMouseOver = false;
+
+      let loading = false;
 
       // Fetch initial song list and play the first song
       /*
@@ -558,6 +563,7 @@
           (obj) => obj.num == songNum
         ).musician;
 
+        loading = true;
         fetch(`/photo/${songNum}?${Math.random()}`)
           .then((response) => {
             if (response.ok) {
@@ -575,10 +581,9 @@
               background.src = url; // 更改图片源
               background.style.opacity = "1"; // 设置不透明度为1，结束渐变
               background.style.transform = "scale(1)";
-            }, 500); // 等待0.5秒，与过渡效果时间一致
-            setTimeout(() => {
               background.style.transition = "0.5s";
-            }, 500);
+              loading = false;
+            }, 500); // 等待0.5秒，与过渡效果时间一致
           })
           .catch((error) => console.error("Failed to fetch photo:", error));
         audio.src = `/music/${songNum}`;
@@ -603,8 +608,19 @@
         }
       }
 
-      function playNextSong() {
-        if (PlayMode == "Loop") {
+      function playNextSong(auto = false) {
+        // 更新历史记录
+        if (currentSongIndex !== -1) {
+          if (historyIndex < playHistory.length - 1) {
+            // 如果当前不在历史记录的最后，截断历史记录
+            playHistory = playHistory.slice(0, historyIndex + 1);
+          }
+          playHistory.push(currentSongIndex);
+          historyIndex = playHistory.length - 1;
+        }
+        console.log(playHistory, historyIndex);
+
+        if (PlayMode == "Loop" && auto) {
           currentSongIndex = currentSongIndex;
         } else if (PlayMode == "Random") {
           NextSongIndex = Math.floor(Math.random() * songList.length);
@@ -619,16 +635,24 @@
       }
 
       function playPrevSong() {
-        if (PlayMode == "Loop") {
-          currentSongIndex = currentSongIndex;
-        } else if (PlayMode == "Random") {
-          NextSongIndex = Math.floor(Math.random() * songList.length);
-          while (currentSongIndex == NextSongIndex && songList.length > 1) {
-            NextSongIndex = Math.floor(Math.random() * songList.length);
-          }
-          currentSongIndex = NextSongIndex;
+        // 从历史记录中获取上一首歌曲
+        if (historyIndex > 0) {
+          currentSongIndex = playHistory[historyIndex];
+          historyIndex--;
+          console.log(playHistory, historyIndex);
         } else {
-          currentSongIndex = currentSongIndex - 1;
+          // 如果没有上一首歌曲，根据播放模式选择上一首
+          if (PlayMode == "Loop") {
+            currentSongIndex = currentSongIndex;
+          } else if (PlayMode == "Random") {
+            NextSongIndex = Math.floor(Math.random() * songList.length);
+            while (currentSongIndex == NextSongIndex && songList.length > 1) {
+              NextSongIndex = Math.floor(Math.random() * songList.length);
+            }
+            currentSongIndex = NextSongIndex;
+          } else {
+            currentSongIndex = currentSongIndex - 1;
+          }
           if (currentSongIndex < 0) currentSongIndex = songList.length - 1;
         }
         loadSong(songList[currentSongIndex].num);
@@ -681,16 +705,18 @@
             max_VH = Math.max(max_VH,dataArray[i])
           }
           var VH=20000
-          if(now_VH>VH && !PiPNow){
+          if(!loading){
+            if(now_VH>VH/* && !PiPNow*/){
             console.info("high",now_VH)
             if(effect1){effects.style["box-shadow"] = `inset white 0px 0px 50px ${(now_VH-25000)*0.01}px`;}
             if(effect2){background.style.transition = "0.01s";
                         background.style.transform = `scale(${1+(now_VH-VH)/50000})`;}
-          }
-          else{
-            if(effect1){effects.style["box-shadow"] = `inset white 0px 0px 0px 0px`;}
-            if(effect2){background.style.transition = "0.5s";
-                        background.style.transform = `scale(1)`;}
+            }
+            else{
+              if(effect1){effects.style["box-shadow"] = `inset white 0px 0px 0px 0px`;}
+              if(effect2){background.style.transition = "0.5s";
+                          background.style.transform = `scale(1)`;}
+            }
           }
           /*
           if(now_VH-last_VH>1000){
@@ -734,19 +760,24 @@
       }
       updateVisualizer();
 
+      var ShowTipTimeOut;
+
+      function ShowInfo(info) {
+        Show.innerText = info;
+        Show.style.opacity = "1";
+        clearTimeout(ShowTipTimeOut);
+        ShowTipTimeOut = setTimeout(() => {
+          Show.style.opacity = "0";
+        },1000)
+      }
+
       function setVolume(volume) {
         gainNode.gain.value = volume;
         var percentage = gainNode.gain.value * 100;
         Vprogress.style.width = percentage + "%";
-        Volume.innerText = Math.round(percentage) + "%";
-        Volume.style.opacity = "1";
+        ShowInfo(Math.round(percentage) + "%");
         
         setCookie()
-
-        clearTimeout(VolumeTipTimeOut);
-        VolumeTipTimeOut = setTimeout(() => {
-          Volume.style.opacity = "0";
-        },1000)
       }
 
       function formatTime(seconds) {
@@ -765,16 +796,11 @@
 
       function OpenSidebar() {
         if (BarOpened) {
-          if (AlbumMenuOpened){
-            OpenAlbumMenu();
-          }
-          else{
-            BarOpened = false;
-            menu.style.transform = `translateX(-${MenuWidth})`;
-            music_area.style.left = "0";
-            SidebarButton.style["background-color"] = "rgba(160, 160, 160, 0)";
-            Tip.style.opacity = "0";
-          }
+          BarOpened = false;
+          menu.style.transform = `translateX(-${MenuWidth})`;
+          music_area.style.left = "0";
+          SidebarButton.style["background-color"] = "rgba(160, 160, 160, 0)";
+          Tip.style.opacity = "0";
         } else {
           BarOpened = true;
           menu.style.transform = "translateX(0px)";
@@ -795,6 +821,9 @@
             Item.addEventListener("click", () => {
                 currentAlbum = id;
                 loadAlbum(id);
+                if (AlbumMenuOpened){
+                  OpenAlbumMenu();
+                }
             });
             albumList.appendChild(Item);
         }
@@ -900,7 +929,8 @@
         for (let i = 0; i < cookieArray.length; i++) {
           cookiePair = cookieArray[i].split('=');
           if (cookiePair[0] === "Volume") {
-            setVolume(decodeURIComponent(cookiePair[1]));
+            setVolume(decodeURIComponent(cookiePair[1])/100);
+            console.log("Volume: ",decodeURIComponent(cookiePair[1])/100);
           }
           if (cookiePair[0] === "CurrentAlbum") {
             currentAlbum = decodeURIComponent(cookiePair[1]);
@@ -919,7 +949,7 @@
         date.setTime(date.getTime() + (2592000000));//一个月
         expires = "; expires=" + date.toUTCString();
         // 存储音量信息
-        const volumeCookie = "Volume" + "=" + "0." + encodeURIComponent(Math.round(gainNode.gain.value * 100));
+        const volumeCookie = "Volume" + "=" + encodeURIComponent(Math.round(gainNode.gain.value * 100));
         // 存储当前专辑信息
         const currentAlbumCookie = "CurrentAlbum" + "=" + encodeURIComponent(currentAlbum);
         // 同时设置两个 cookie
@@ -933,7 +963,7 @@
       playPauseButton.addEventListener("click", togglePlayPause);
       nextButton.addEventListener("click", playNextSong);
       prevButton.addEventListener("click", playPrevSong);
-      audio.addEventListener("ended", playNextSong);
+      audio.addEventListener("ended", () => playNextSong(true));
 
       audio.addEventListener("timeupdate", function () {
         currentTime.textContent = formatTime(audio.currentTime);
@@ -950,7 +980,7 @@
         setVolume(1);
       });
 
-      playMode.addEventListener("click", function () {
+      function changePlayMode() {
         console.log(PlayMode);
         if (PlayMode == "Sequential") {
           console.info("顺序播放");
@@ -965,6 +995,11 @@
           PlayMode = "Sequential"; //顺序播放
           playMode.src = "/icon/arrow-right.svg";
         }
+        ShowInfo("播放模式: " + PlayMode);
+      }
+
+      playMode.addEventListener("click", function () {
+        changePlayMode();
       });
 
       let isCoolDown = false;
@@ -981,6 +1016,12 @@
             break;
           case "KeyA":
             OpenAlbumMenu();
+            break;
+          case "KeyP":
+            OpenPiP();
+            break;
+          case "KeyS":
+            changePlayMode();
             break;
           case "Space":
             togglePlayPause();
@@ -1009,7 +1050,7 @@
             break;
           case "ArrowUp":
             var newVolume = gainNode.gain.value + 0.1;
-            if (newVolume > 1) newVolume = 1;
+            if (newVolume > 10) newVolume = 10;
             setVolume(newVolume);
             break;
           case "ArrowDown":
@@ -1196,11 +1237,6 @@
       }
       document.getElementById("PiP").addEventListener("click", function () {
         OpenPiP();
-      });
-      document.addEventListener("keydown", function (event) {
-        if(event.code=="KeyP"){
-            OpenPiP();
-          }
       });
     </script>
   </body>

@@ -11,6 +11,9 @@ import subprocess
 import uuid
 import json
 
+# 导入内容解析模块
+from content_parser import process_content
+
 music_path = "music"
 if not os.path.exists(music_path):
     os.mkdir(music_path)
@@ -67,12 +70,9 @@ async def get_index():
     print(f"访问次数：{time}")
     return FileResponse("static/index.html")
 
-@app.get("/", response_class=HTMLResponse)
-async def get_index():
-    global time
-    time += 1
-    print(f"访问次数：{time}")
-    return FileResponse("static/index.html")
+@app.get("/add_content", response_class=HTMLResponse)
+async def add_content():
+    return FileResponse("static/add_content.html")
 
 
 @app.get("/file/{page_name}", response_class=HTMLResponse)
@@ -279,49 +279,129 @@ async def add_music(
         song_name: str = Form(...),
         composer: str = Form(...)
 ):
+    """传统方式添加音乐文件，包含音量均衡处理"""
     # 为新歌曲创建唯一标识符
     new_song_num = uuid.uuid4()  # str(len(os.listdir(music_path)) + 1)
 
     # 为歌曲创建新文件夹
     new_song_folder = f"{music_path}/{new_song_num}"
-    os.makedirs(new_song_folder, exist_ok=True)
-
-    # 保存音乐文件
-    yuan = new_song_folder + "/original_" + music_file.filename
-    with open(yuan, "wb") as file:
-        file.write(music_file.file.read())
-    original_music_path = f"{new_song_folder}/music.mp3"
+    
+    # 保存音乐文件到临时位置
+    temp_file = f"temp_{uuid.uuid4()}_{music_file.filename}"
     try:
-        # 调用 ffmpeg 尝试解码并转换上传的音频文件
-        # 构建 ffmpeg 命令
-        cmd = ["ffmpeg", "-i", yuan, "-vn", "-ar", "44100", "-ac", "2", "-b:a", "192k", original_music_path]
+        with open(temp_file, "wb") as file:
+            file.write(music_file.file.read())
+            
+        # 创建目标文件夹
+        os.makedirs(new_song_folder, exist_ok=True)
+        
+        # 临时原始文件路径
+        yuan = new_song_folder + "/original_" + music_file.filename
+        # 最终音乐文件路径
+        original_music_path = f"{new_song_folder}/music.mp3"
+        
+        # 复制临时文件到原始文件位置
+        with open(yuan, "wb") as dest_file:
+            with open(temp_file, "rb") as src_file:
+                dest_file.write(src_file.read())
+        
+        # 调用 ffmpeg 尝试解码并转换上传的音频文件，添加音量均衡处理
+        # 使用loudnorm滤镜实现音量均衡，目标响度为-16 LUFS
+        cmd = [
+            "ffmpeg", "-i", yuan, "-af", 
+            "loudnorm=I=-16:LRA=11:TP=-1.5:print_format=summary", 
+            "-vn", "-ar", "44100", "-ac", "2", "-b:a", "192k", 
+            original_music_path
+        ]
         # 执行命令
         subprocess.run(cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        
+        # 保存图像文件
+        image_path = f"{new_song_folder}/music.png"
+        try:
+            # 尝试打开上传的图片文件
+            img = Image.open(image_file.file)
+            # 转换为png格式
+            img.save(image_path, "PNG")
+        except Exception as e:
+            # 如果图像处理失败，清理已创建的文件夹和文件
+            if os.path.exists(new_song_folder):
+                for file_name in os.listdir(new_song_folder):
+                    file_path = os.path.join(new_song_folder, file_name)
+                    if os.path.isfile(file_path):
+                        os.remove(file_path)
+                os.rmdir(new_song_folder)
+            raise HTTPException(status_code=400, detail=f"无法处理图像文件: {str(e)}")
+
+        # 保存歌曲信息
+        with open(f"{new_song_folder}/music.txt", "w", encoding="utf-8") as file:
+            file.write(f"{composer}\n{song_name}")
+            
+        # 处理完成后删除临时原始文件
+        if os.path.exists(yuan):
+            os.remove(yuan)
+            
+        return {"num": new_song_num}
+        
     except subprocess.CalledProcessError as e:
         # 如果 ffmpeg 返回非零退出码，表示命令执行失败
         # 获取错误信息
         error_info = e.stderr.decode("utf-8").strip()
+        # 清理已创建的文件夹和文件
+        if os.path.exists(new_song_folder):
+            for file_name in os.listdir(new_song_folder):
+                file_path = os.path.join(new_song_folder, file_name)
+                if os.path.isfile(file_path):
+                    os.remove(file_path)
+            os.rmdir(new_song_folder)
         # 根据错误信息判断是否是无法解码的情况
         raise HTTPException(status_code=500, detail=f"处理音频文件时出错: {error_info}")
     except FileNotFoundError:
         # 如果 ffmpeg 命令未找到
+        # 清理已创建的文件夹和文件
+        if os.path.exists(new_song_folder):
+            for file_name in os.listdir(new_song_folder):
+                file_path = os.path.join(new_song_folder, file_name)
+                if os.path.isfile(file_path):
+                    os.remove(file_path)
+            os.rmdir(new_song_folder)
         raise HTTPException(status_code=500, detail="系统未安装 ffmpeg 或音频传输异常")
-
-    # 保存图像文件
-    image_path = f"{new_song_folder}/music.png"
-    try:
-        # 尝试打开上传的图片文件
-        img = Image.open(image_file.file)
-        # 转换为png格式
-        img.save(image_path, "PNG")
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"无法处理图像文件: {str(e)}")
+        # 处理其他异常
+        # 清理已创建的文件夹和文件
+        if os.path.exists(new_song_folder):
+            for file_name in os.listdir(new_song_folder):
+                file_path = os.path.join(new_song_folder, file_name)
+                if os.path.isfile(file_path):
+                    os.remove(file_path)
+            os.rmdir(new_song_folder)
+        raise HTTPException(status_code=500, detail=f"处理文件时出错: {str(e)}")
+    finally:
+        # 确保临时文件被删除
+        if os.path.exists(temp_file):
+            os.remove(temp_file)
 
-    # 保存歌曲信息
-    with open(f"{new_song_folder}/music.txt", "w", encoding="utf-8") as file:
-        file.write(f"{composer}\n{song_name}")
 
-    return {"num": new_song_num}
+@app.post("/parse_content")
+async def parse_content(url: str = Form(...)):
+    """解析URL内容但不保存，返回解析结果供前端显示"""
+    try:
+        # 使用内容解析模块解析URL，但不下载和保存文件
+        from content_parser import parse_url_info
+        result = parse_url_info(url)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.post("/add_content_by_url")
+async def add_content_by_url(url: str = Form(...), song_name: str = Form(None), composer: str = Form(None)):
+    """通过URL添加Bilibili内容，可选择性地覆盖解析出的标题和作者"""
+    try:
+        # 使用内容解析模块处理URL
+        result = process_content(url, music_path, override_title=song_name, override_author=composer)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 # @app.put("/update_music/{num}")
