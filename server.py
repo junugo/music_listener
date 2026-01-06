@@ -14,12 +14,15 @@ import json
 # 导入内容解析模块
 from content_parser import process_content
 
+# 定义文件路径常量
+temp_path = "temp"
 music_path = "music"
-if not os.path.exists(music_path):
-    os.mkdir(music_path)
 album_path = "album"
-if not os.path.exists(album_path):
-    os.mkdir(album_path)
+
+# 确保必要的文件夹存在
+for folder in [temp_path, music_path, album_path]:
+    if not os.path.exists(folder):
+        os.mkdir(folder)
 
 app = FastAPI()
 
@@ -286,8 +289,8 @@ async def add_music(
     # 为歌曲创建新文件夹
     new_song_folder = f"{music_path}/{new_song_num}"
     
-    # 保存音乐文件到临时位置
-    temp_file = f"temp_{uuid.uuid4()}_{music_file.filename}"
+    # 保存音乐文件到temp文件夹下的临时位置
+    temp_file = f"{temp_path}/temp_{uuid.uuid4()}_{music_file.filename}"
     try:
         with open(temp_file, "wb") as file:
             file.write(music_file.file.read())

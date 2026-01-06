@@ -10,6 +10,13 @@ from urllib.parse import urlparse
 from PIL import Image
 from io import BytesIO
 
+# 定义临时文件路径常量
+temp_path = "temp"
+
+# 确保temp文件夹存在
+if not os.path.exists(temp_path):
+    os.mkdir(temp_path)
+
 # Bilibili API相关
 class BilibiliParser:
     def __init__(self):
@@ -173,7 +180,7 @@ def process_content(url: str, music_path: str, override_title: str = None, overr
     """处理内容并保存到本地，可选择性地覆盖标题和作者"""
     # 创建临时文件标识符
     temp_id = str(uuid.uuid4())
-    temp_folder = f"temp_{temp_id}"
+    temp_folder = f"{temp_path}/temp_{temp_id}"
     
     try:
         # 创建解析器
@@ -196,7 +203,7 @@ def process_content(url: str, music_path: str, override_title: str = None, overr
         new_song_num = str(uuid.uuid4())
         new_song_folder = f"{music_path}/{new_song_num}"
         
-        # 先下载到临时位置
+        # 先下载到temp文件夹下的临时位置
         os.makedirs(temp_folder, exist_ok=True)
         temp_music_path = f"{temp_folder}/temp_music.mp3"
         temp_cover_path = f"{temp_folder}/temp_cover.png"
