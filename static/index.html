@@ -913,7 +913,7 @@
           count = 0;
 
           for (const [id, song] of Object.entries(songList)) {
-              if (song.name.toLowerCase().includes(query)) {
+              if (song.name.toLowerCase().includes(query) || song.musician.toLowerCase().includes(query)) {
                   filteredSongs[count++] = song;
               }
           }

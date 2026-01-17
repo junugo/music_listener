@@ -1,3 +1,5 @@
+#Python获取ffmepg进度: https://blog.csdn.net/qq_41730930/article/details/103815613
+
 import os
 import re
 import json
@@ -82,7 +84,7 @@ class BilibiliParser:
         except Exception as e:
             raise Exception(f"获取Bilibili视频信息失败: {str(e)}")
     
-    def download_video(self, video_id: str, cid: str, save_path: str) -> str:
+    def download_video(self, video_id: str, cid: str, save_path: str, progress_callback=None) -> str:
         """下载视频文件"""
         try:
             # 获取视频下载链接
@@ -104,22 +106,82 @@ class BilibiliParser:
             # 下载视频文件
             headers = self.headers.copy()
             headers['Referer'] = f"https://www.bilibili.com/video/{video_id}"
-            response = requests.get(video_url, headers=headers, stream=True)
-            response.raise_for_status()
             
-            temp_path = save_path + ".temp"
-            with open(temp_path, 'wb') as f:
-                for chunk in response.iter_content(chunk_size=8192):
-                    if chunk:
-                        f.write(chunk)
+            # 获取文件大小用于进度计算
+            with requests.get(video_url, headers=headers, stream=True) as r:
+                r.raise_for_status()
+                total_size = int(r.headers.get('content-length', 0))
+                downloaded_size = 0
+                
+                download_temp_path = save_path + ".temp"
+                with open(download_temp_path, 'wb') as f:
+                    for chunk in r.iter_content(chunk_size=8192):
+                        if chunk:
+                            f.write(chunk)
+                            downloaded_size += len(chunk)
+                            # 报告下载进度（0-40%）
+                            if progress_callback and total_size > 0:
+                                progress = int((downloaded_size / total_size) * 40)
+                                progress_callback(progress, "正在下载音频...")
             
-            # 使用ffmpeg转换为mp3格式
-            cmd = ["ffmpeg", "-i", temp_path, "-vn", "-ar", "44100", "-ac", "2", "-b:a", "192k", save_path]
-            subprocess.run(cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            # 报告转换开始（40%）
+            if progress_callback:
+                progress_callback(40, "正在转换音频格式...")
+            
+            try:
+                # 使用subprocess调用ffmpeg，通过stderr获取进度信息
+                cmd = ["ffmpeg", "-i", download_temp_path, "-vn", "-ar", "44100", "-ac", "2", "-b:a", "192k", save_path]
+                
+                # 启动ffmpeg进程，捕获stderr输出
+                process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+                
+                # 实时解析进度
+                last_progress = 0
+                # 读取初始输入文件信息获取总时长
+                total_duration = 0
+                for line in process.stderr:
+                    # 解析总时长
+                    if 'Duration:' in line:
+                        duration_match = re.search(r'Duration: (\d+):(\d+):(\d+\.\d+)', line)
+                        if duration_match:
+                            h, m, s = duration_match.groups()
+                            total_duration = int(h) * 3600 + int(m) * 60 + float(s)
+                    # 解析编码进度
+                    elif 'time=' in line:
+                        time_match = re.search(r'time=(\d+):(\d+):(\d+\.\d+)', line)
+                        if time_match and total_duration > 0:
+                            h, m, s = time_match.groups()
+                            current_time = int(h) * 3600 + int(m) * 60 + float(s)
+                            # 计算当前进度比例（0-1）
+                            progress_ratio = min(current_time / total_duration, 1.0)
+                            # 转换为40%-70%范围
+                            current_progress = 40 + int(progress_ratio * 30)
+                            
+                            # 确保进度只增不减，且在40%-70%范围内
+                            if current_progress > last_progress and current_progress <= 70:
+                                last_progress = current_progress
+                                if progress_callback:
+                                    progress_callback(current_progress, "正在转换音频格式...")
+                    
+                    # 检查进程是否结束
+                    if process.poll() is not None:
+                        break
+                
+                # 检查ffmpeg进程是否成功完成
+                stdout, stderr = process.communicate()
+                if process.returncode != 0:
+                    raise subprocess.CalledProcessError(process.returncode, cmd, stdout, stderr)
+            except Exception as e:
+                # 处理异常
+                raise
+            
+            # 报告转换完成（70%）
+            if progress_callback:
+                progress_callback(70, "音频格式转换完成")
             
             # 删除临时文件
-            if os.path.exists(temp_path):
-                os.remove(temp_path)
+            if os.path.exists(download_temp_path):
+                os.remove(download_temp_path)
             
             return save_path
         except Exception as e:
@@ -176,7 +238,7 @@ def parse_url_info(url: str) -> Dict[str, Any]:
         raise Exception(f"解析内容失败: {str(e)}")
 
 # 统一的内容处理函数
-def process_content(url: str, music_path: str, override_title: str = None, override_author: str = None) -> Dict[str, Any]:
+def process_content(url: str, music_path: str, override_title: str = None, override_author: str = None, progress_callback=None) -> Dict[str, Any]:
     """处理内容并保存到本地，可选择性地覆盖标题和作者"""
     # 创建临时文件标识符
     temp_id = str(uuid.uuid4())
@@ -208,23 +270,66 @@ def process_content(url: str, music_path: str, override_title: str = None, overr
         temp_music_path = f"{temp_folder}/temp_music.mp3"
         temp_cover_path = f"{temp_folder}/temp_cover.png"
         
-        # 下载视频文件到临时位置
-        parser.download_video(content_id, info['cid'], temp_music_path)
+        # 下载视频文件到临时位置，传递进度回调
+        parser.download_video(content_id, info['cid'], temp_music_path, progress_callback)
         
-        # 下载封面到临时位置
+        # 下载封面到临时位置（70%）
+        if progress_callback:
+            progress_callback(70, "正在下载封面图片...")
         parser.download_cover(info['cover_url'], temp_cover_path)
         
-        # 音频音量均衡处理
+        # 音频音量均衡处理（75%）
+        if progress_callback:
+            progress_callback(75, "正在进行音频均衡处理...")
         normalized_music_path = f"{temp_folder}/normalized_music.mp3"
         try:
-            # 使用ffmpeg进行音量均衡
+            # 使用ffmpeg进行音量均衡，通过stderr获取进度信息
             cmd = [
                 "ffmpeg", "-i", temp_music_path, "-af", 
                 "loudnorm=I=-16:LRA=11:TP=-1.5:print_format=summary", 
-                "-vn", "-ar", "44100", "-ac", "2", "-b:a", "192k", 
+                "-vn", "-ar", "44100", "-ac", "2", "-b:a", "192k",
                 normalized_music_path
             ]
-            subprocess.run(cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            
+            # 启动ffmpeg进程，捕获stderr输出
+            process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            
+            # 实时解析进度
+            last_progress = 75  # 起始进度
+            # 读取初始输入文件信息获取总时长
+            total_duration = 0
+            for line in process.stderr:
+                # 解析总时长
+                if 'Duration:' in line:
+                    duration_match = re.search(r'Duration: (\d+):(\d+):(\d+\.\d+)', line)
+                    if duration_match:
+                        h, m, s = duration_match.groups()
+                        total_duration = int(h) * 3600 + int(m) * 60 + float(s)
+                # 解析编码进度
+                elif 'time=' in line:
+                    time_match = re.search(r'time=(\d+):(\d+):(\d+\.\d+)', line)
+                    if time_match and total_duration > 0:
+                        h, m, s = time_match.groups()
+                        current_time = int(h) * 3600 + int(m) * 60 + float(s)
+                        # 计算当前进度比例（0-1）
+                        progress_ratio = min(current_time / total_duration, 1.0)
+                        # 转换为75%-95%范围
+                        current_progress = 75 + int(progress_ratio * 20)
+                        
+                        # 确保进度只增不减，且在75%-95%范围内
+                        if current_progress > last_progress and current_progress <= 95:
+                            last_progress = current_progress
+                            if progress_callback:
+                                progress_callback(current_progress, "正在进行音频均衡处理...")
+                
+                # 检查进程是否结束
+                if process.poll() is not None:
+                    break
+            
+            # 检查ffmpeg进程是否成功完成
+            stdout, stderr = process.communicate()
+            if process.returncode != 0:
+                raise subprocess.CalledProcessError(process.returncode, cmd, stdout, stderr)
         except Exception as e:
             # 清理临时文件夹
             if os.path.exists(temp_folder):
@@ -235,7 +340,9 @@ def process_content(url: str, music_path: str, override_title: str = None, overr
                 os.rmdir(temp_folder)
             raise Exception(f"音频处理失败: {str(e)}")
         
-        # 所有文件下载和处理成功后，创建最终目标文件夹
+        # 所有文件下载和处理成功后，创建最终目标文件夹（95%）
+        if progress_callback:
+            progress_callback(95, "正在保存文件...")
         os.makedirs(new_song_folder, exist_ok=True)
         
         # 复制处理好的文件到最终位置
@@ -256,6 +363,11 @@ def process_content(url: str, music_path: str, override_title: str = None, overr
                 if os.path.isfile(file_path):
                     os.remove(file_path)
             os.rmdir(temp_folder)
+        
+        # 处理完成（100%）
+        if progress_callback:
+            progress_callback(100, "处理完成")
+        
         return {
             "song_id": new_song_num,
             "song_name": song_name,
@@ -272,7 +384,7 @@ def process_content(url: str, music_path: str, override_title: str = None, overr
             os.rmdir(temp_folder)
         
         # 如果文件夹已创建，则删除
-        if os.path.exists(new_song_folder):
+        if 'new_song_folder' in locals() and os.path.exists(new_song_folder):
             for file_name in os.listdir(new_song_folder):
                 file_path = os.path.join(new_song_folder, file_name)
                 if os.path.isfile(file_path):

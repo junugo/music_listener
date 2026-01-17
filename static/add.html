@@ -335,36 +335,64 @@
             e.preventDefault();
             
             const formData = new FormData(form);
-            const xhr = new XMLHttpRequest();
             
             uploadProgress.style.display = 'block';
-            uploadStatus.textContent = '正在上传...';
+            uploadStatus.textContent = '上传中...';
+            progressFill.style.width = '0%';
             
-            xhr.upload.addEventListener('progress', function(e) {
-                if (e.lengthComputable) {
-                    const percentComplete = (e.loaded / e.total) * 100;
-                    progressFill.style.width = percentComplete + '%';
-                    uploadStatus.textContent = `已上传 ${Math.round(percentComplete)}%`;
+            fetch('/add_music', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('上传失败');
                 }
+                return response.json();
+            })
+            .then(data => {
+                // 获取任务ID
+                const taskId = data.task_id;
+                
+                // 开始轮询任务进度
+                const progressInterval = setInterval(() => {
+                    fetch(`/task_progress/${taskId}`)
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error('获取进度失败');
+                        }
+                        return response.json();
+                    })
+                    .then(progressData => {
+                        const progress = progressData.progress;
+                        const status = progressData.status;
+                        
+                        // 更新进度显示
+                        progressFill.style.width = `${progress}%`;
+                        uploadStatus.textContent = status;
+                        
+                        // 如果任务完成或失败，停止轮询
+                        if (progress === 100 || status.startsWith('处理失败') || status.startsWith('错误')) {
+                            clearInterval(progressInterval);
+                            
+                            if (progress === 100) {
+                                setTimeout(() => {
+                                    window.location.href = '/';
+                                }, 1500);
+                            }
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error getting progress:', error);
+                        clearInterval(progressInterval);
+                        uploadStatus.textContent = '获取进度失败';
+                    });
+                }, 1000); // 每秒轮询一次
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                uploadStatus.textContent = error.message || '上传失败';
             });
-            
-            xhr.addEventListener('load', function() {
-                if (xhr.status === 200) {
-                    uploadStatus.textContent = '上传成功！';
-                    setTimeout(() => {
-                        window.location.href = '/';
-                    }, 1500);
-                } else {
-                    uploadStatus.textContent = '上传失败，请重试';
-                }
-            });
-            
-            xhr.addEventListener('error', function() {
-                uploadStatus.textContent = '上传失败，请重试';
-            });
-            
-            xhr.open('POST', '/add_music');
-            xhr.send(formData);
         });
 
         // 文件选择提示
@@ -461,26 +489,26 @@
          // 导入按钮功能
          document.getElementById('urlForm').addEventListener('submit', (e) => {
              e.preventDefault();
-              
+               
              const url = document.getElementById('contentUrl').value;
              const title = document.getElementById('parsedTitle').value;
              const author = document.getElementById('parsedAuthor').value;
-              
+               
              if (!url) {
                  alert('请输入有效的Bilibili链接');
                  return;
              }
-              
+               
              urlProgressText.textContent = '导入中...';
              urlProgressFill.style.width = '0%';
              importButton.disabled = true;
-              
+               
              // 调用导入API - 改为使用FormData
              const formData = new FormData();
              formData.append('url', url);
              formData.append('song_name', title);
              formData.append('composer', author);
-              
+               
              fetch('/add_content_by_url', {
                  method: 'POST',
                  body: formData
@@ -492,12 +520,43 @@
                  return response.json();
              })
              .then(data => {
-                 urlProgressFill.style.width = '100%';
-                 urlProgressText.textContent = '导入成功！';
+                 // 获取任务ID
+                 const taskId = data.task_id;
                  
-                 setTimeout(() => {
-                     window.location.href = '/';
-                 }, 1500);
+                 // 开始轮询任务进度
+                 const progressInterval = setInterval(() => {
+                     fetch(`/task_progress/${taskId}`)
+                     .then(response => {
+                         if (!response.ok) {
+                             throw new Error('获取进度失败');
+                         }
+                         return response.json();
+                     })
+                     .then(progressData => {
+                         const progress = progressData.progress;
+                         const status = progressData.status;
+                         
+                         // 更新进度显示
+                         urlProgressFill.style.width = `${progress}%`;
+                         urlProgressText.textContent = status;
+                         
+                         // 如果任务完成或失败，停止轮询
+                         if (progress === 100 || status.startsWith('处理失败') || status.startsWith('错误')) {
+                             clearInterval(progressInterval);
+                             
+                             if (progress === 100) {
+                                 setTimeout(() => {
+                                     window.location.href = '/';
+                                 }, 1500);
+                             }
+                         }
+                     })
+                     .catch(error => {
+                         console.error('Error getting progress:', error);
+                         clearInterval(progressInterval);
+                         urlProgressText.textContent = '获取进度失败';
+                     });
+                 }, 1000); // 每秒轮询一次
              })
              .catch(error => {
                  console.error('Error:', error);
