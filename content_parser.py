@@ -355,6 +355,10 @@ def process_content(url: str, music_path: str, override_title: str = None, overr
         # 保存歌曲信息
         with open(f"{new_song_folder}/music.txt", "w", encoding="utf-8") as file:
             file.write(f"{composer}\n{song_name}")
+
+        # 保存歌曲网址
+        with open(f"{new_song_folder}/URL.txt", "w", encoding="utf-8") as file:
+            file.write(url)
         
         # 清理临时文件夹
         if os.path.exists(temp_folder):

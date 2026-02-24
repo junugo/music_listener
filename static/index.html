@@ -689,6 +689,16 @@
         loadSong(songList[currentSongIndex].num);
       }
 
+      function openURL() {
+        console.info(songList[currentSongIndex].URL);
+        if (songList[currentSongIndex].URL == "None") {
+          ShowInfo("该歌曲未存储地址");
+        }
+        else {
+          window.open(songList[currentSongIndex].URL, '_blank', 'noopener,noreferrer');
+        }
+      }
+
       const analyser = audioContext.createAnalyser();
       const gainNode = audioContext.createGain();
       const context = visualizer.getContext("2d");
@@ -1030,6 +1040,10 @@
         setVolume(1);
       });
 
+      songTitle.addEventListener("click", function () {
+        openURL();
+      });
+
       function changePlayMode() {
         console.log(PlayMode);
         if (PlayMode == "Sequential") {
@@ -1112,6 +1126,9 @@
             var newVolume = gainNode.gain.value - 0.1;
             if (newVolume < 0) newVolume = 0;
             setVolume(newVolume);
+            break;
+          case "KeyL":
+            openURL();
             break;
           default:
             break;

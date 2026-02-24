@@ -62,11 +62,20 @@ def get_music_info(num):
                                                      file.lower().endswith(ext) for ext in
                                                      pic_valid_extensions) and "music." in file][0])
 
+
+    url_file = f"{music_folder}/URL.txt"
+    if not os.path.exists(url_file):
+        url = "None"
+    else:
+        with open(url_file, "r", encoding="utf-8") as file:
+            url = file.readline().strip()
+
     return {
         "composer": composer,
         "song_name": song_name,
         "music_file": music_file,
         "image_file": image_file,
+        "url": url,
     }
 
 
@@ -200,7 +209,7 @@ def get_song(songList):
             try:
                 info = get_music_info(song)
                 song_list.append(
-                    {"num": song, "name": info["song_name"], "musician": info["composer"]})
+                    {"num": song, "name": info["song_name"], "musician": info["composer"], "URL": info["url"]})
             except HTTPException as e:
                 raise e
     return song_list
