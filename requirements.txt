@@ -2,3 +2,4 @@ uvicorn~=0.27.0
 pillow~=10.2.0
 fastapi~=0.109.0
 python_multipart~=0.0.20
+requests~=2.32.0

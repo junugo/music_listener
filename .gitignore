@@ -1,6 +1,6 @@
 /ffmpeg/
 /frp/
-/venv/
+/.venv/
 /music/
 /album/
 /temp/
@@ -13,3 +13,4 @@ __pycache__/
 ffmpeg.exe
 ffplay.exe
 ffprobe.exe
+*.lnk

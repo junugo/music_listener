@@ -449,6 +449,8 @@
       let all_albums = {};
       let playHistory = []; // 播放历史记录
       let historyIndex = -1; // 当前在历史记录中的位置
+      let shuffleQueue = []; // Shuffle 模式的歌曲队列
+      let shuffleIndex = 0; // 当前在 Shuffle 队列中的位置
 
       const prevButton = document.getElementById("prevButton");
       const playPauseButton = document.getElementById("playPauseButton");
@@ -557,12 +559,52 @@
             renderSongList(songList);
             playHistory = []
             historyIndex = -1;
+            // 清空 Shuffle 队列
+            shuffleQueue = [];
+            shuffleIndex = 0;
           })
           .catch((error) =>
             console.error("Failed to fetch initial song list:", error)
           );
       }
       //loadAlbum("all");
+
+      // 生成 Shuffle 队列（Fisher-Yates 算法）
+      function generateShuffleQueue() {
+        console.log("Generating shuffle queue...");
+        if (songList.length === 0) return [];
+        if (songList.length === 1) return [0];
+        
+        let queue = [...Array(songList.length).keys()];
+        
+        for (let i = queue.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [queue[i], queue[j]] = [queue[j], queue[i]];
+        }
+        
+        return queue;
+      }
+
+      function addToHistory(songIndex) {
+        if (songIndex == currentSongIndex) {
+          return;
+        }
+        // 如果当前不在历史记录的最后，截断历史记录
+        if (historyIndex < playHistory.length - 1) {
+          playHistory = playHistory.slice(0, historyIndex + 1);
+        }
+        
+        playHistory.push(songIndex);
+        
+        // 限制历史记录长度为 100
+        if (playHistory.length > 100) {
+          playHistory.shift();
+        } else {
+          historyIndex++;
+        }
+        
+        historyIndex = playHistory.length - 1;
+      }
 
       function loadSong(songNum) {
         fetch(`/name/${songNum}`)
@@ -644,21 +686,22 @@
           if (PlayMode == "Loop" && auto) {
             currentSongIndex = currentSongIndex;
           } else if (PlayMode == "Random") {
-            NextSongIndex = Math.floor(Math.random() * songList.length);
-            while (currentSongIndex == NextSongIndex && songList.length > 1) {
-              NextSongIndex = Math.floor(Math.random() * songList.length);
+            while (shuffleQueue[shuffleIndex] === currentSongIndex && songList.length > 1) {
+              shuffleIndex++;
             }
-            currentSongIndex = NextSongIndex;
+            if (shuffleQueue.length === 0 || shuffleIndex >= shuffleQueue.length) {
+              shuffleQueue = generateShuffleQueue();
+              shuffleIndex = 0;
+            }
+            if (shuffleQueue[0] === currentSongIndex && songList.length > 1) {
+              shuffleIndex = 1;
+            }
+            
+            currentSongIndex = shuffleQueue[shuffleIndex];
           } else {
             currentSongIndex = (currentSongIndex + 1) % songList.length;
           }
-          playHistory.push(currentSongIndex);
-          // 若播放历史列表长度超过100，删除最前面的元素
-          if (playHistory.length > 100) {
-            playHistory.shift();
-            historyIndex--;
-          }
-          historyIndex = playHistory.length - 1;
+          addToHistory(currentSongIndex);
         }
         console.log(playHistory, historyIndex);
 
@@ -1059,6 +1102,10 @@
           PlayMode = "Sequential"; //顺序播放
           playMode.src = "/icon/arrow-right.svg";
         }
+        
+        shuffleQueue = [];
+        shuffleIndex = 0;
+        
         ShowInfo("播放模式: " + PlayMode);
       }
 
