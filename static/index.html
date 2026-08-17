@@ -586,7 +586,7 @@
       }
 
       function addToHistory(songIndex) {
-        if (songIndex == currentSongIndex) {
+        if (songIndex == playHistory[playHistory.length - 1] && playHistory.length > 0) {
           return;
         }
         // 如果当前不在历史记录的最后，截断历史记录
